@@ -33,6 +33,8 @@ CORS(app, supports_credentials=True, resources={
             "http://127.0.0.1:5173",
             "http://localhost:5174",
             "http://127.0.0.1:5174",
+            "http://localhost:5175",
+            "http://127.0.0.1:5175",
         ]
     }
 })
@@ -68,9 +70,11 @@ with app.app_context():
     from backend.routes.equipment import bp as equipment_bp
     from backend.routes.visits import bp as visits_bp
     from backend.routes.service_logs import bp as service_logs_bp
+    from backend.routes.equipment_types import bp as equipment_types_bp
     app.register_blueprint(equipment_bp)
     app.register_blueprint(visits_bp)
     app.register_blueprint(service_logs_bp)
+    app.register_blueprint(equipment_types_bp)
 
 @app.route('/')
 def index():
@@ -823,6 +827,60 @@ def handle_customer_by_id(customer_id: int) -> ResponseReturnValue:
             return jsonify({'error': str(e)}), 500
 
     return jsonify({'error': 'Method not allowed'}), 405
+
+
+@app.route('/api/customers/<int:customer_id>/detail', methods=['GET'])
+def customer_detail(customer_id: int) -> ResponseReturnValue:
+    """Return a detailed view of a customer, including equipment with coords, visit history, and service logs.
+
+    Response shape:
+      {
+        customer: {..., next_visit_date},
+        equipment: [Equipment.to_dict()],
+        visits: [Visit.to_dict()],  // sorted desc by visit_date
+        logs: [ServiceLog.to_dict() & { equipment_name, visit_date }], // sorted desc by log_date
+      }
+    """
+    cust = Customer.query.get_or_404(customer_id)
+    eq_items = Equipment.query.filter(Equipment.customer_id == customer_id).all()
+    visits = Visit.query.filter(Visit.customer_id == customer_id).order_by(Visit.visit_date.desc()).all()
+
+    # Service logs for this customer's visits (join for efficient filter)
+    q_logs = (
+        db.session.query(ServiceLog, Visit, Equipment)
+        .join(Visit, ServiceLog.visit_id == Visit.id)
+        .outerjoin(Equipment, ServiceLog.equipment_id == Equipment.id)
+        .filter(Visit.customer_id == customer_id)
+        # MariaDB/MySQL does not support the SQL 'NULLS LAST' clause; avoid using it
+        .order_by(ServiceLog.log_date.desc(), ServiceLog.id.desc())
+    )
+    logs = []
+    for s, v, e in q_logs.all():
+        obj = s.to_dict()
+        try:
+            obj['visit_date'] = v.visit_date.isoformat() if getattr(v, 'visit_date', None) else None
+        except Exception:
+            obj['visit_date'] = None
+        try:
+            obj['equipment_name'] = getattr(e, 'name', None)
+        except Exception:
+            obj['equipment_name'] = None
+        logs.append(obj)
+
+    # Compute next planned/expected visit
+    try:
+        nxt = _compute_next_visit(cust)
+        customer_obj = cust.to_dict()
+        customer_obj['next_visit_date'] = nxt.isoformat() if nxt else None
+    except Exception:
+        customer_obj = cust.to_dict()
+
+    return jsonify({
+        'customer': customer_obj,
+        'equipment': [e.to_dict() for e in eq_items],
+        'visits': [v.to_dict() for v in visits],
+        'logs': logs,
+    })
 
 if __name__ == '__main__':
     # Run on all interfaces so it can be reached from your phone on the same network.

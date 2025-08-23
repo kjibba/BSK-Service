@@ -1,0 +1,311 @@
+customer_id,id,installed_at,latitude,longitude,name,notes,serial_number,type
+3,1,,,,Pump A,,,pump
+4,2,,,,Compressor,,,air
+5,3,2025-08-22,,,Unit X,,,sensor
+1,4,,,,Åtekasse,,,Gift
+6,308,2025-06-27,,,"Åtekasse - 60.338921, 5.268414","60.338921, 5.268414",,Åtekasse
+6,309,2025-06-27,,,"Åtekasse - 60.338757, 5.268227",Luftige,,Åtekasse
+832,310,2025-07-01,,,"Åtekasse - 60.519296, 5.294053",Bak garasje,,Åtekasse
+832,311,2025-07-02,,,"Gassfelle - 60.519248, 5.294050",Hjørne mellom hus og garasje,,Gassfelle
+6,312,2025-07-02,,,"Gassfelle - 60.338772, 5.268395",Under trampoline,,Gassfelle
+774,313,2025-07-31,,,"Åtekasse - 60.267669, 5.333976","Under trapp, bak bod.",,Åtekasse
+774,314,2025-07-31,,,"Åtekasse - 60.267741, 5.334345",Under vedstabel,,Åtekasse
+774,315,2025-07-31,,,"Åtekasse - 60.267776, 5.333743",På husvegg,,Åtekasse
+774,316,2025-07-31,,,"Åtekasse - 60.267664, 5.333778",På husvegg,,Åtekasse
+774,317,2025-07-31,,,"Åtekasse - 60.267771, 5.333520",I hekk.,,Åtekasse
+807,318,2025-08-01,,,"Åtekasse - 60.385740, 5.269943",Bak blomsterpotter ved mur.,,Åtekasse
+807,319,2025-08-01,,,"Åtekasse - 60.385760, 5.269993",Bak skille ved steiner,,Åtekasse
+807,320,2025-08-01,,,"Åtekasse - 60.385793, 5.270040",Utsiden av gjerde ved port.,,Åtekasse
+807,321,2025-08-01,,,"Åtekasse - 60.385812, 5.269977",Under terrasse ved tap,,Åtekasse
+817,322,2025-08-01,,,"Åtekasse - 60.388351, 5.290631",Under trapp ved bod,,Åtekasse
+817,323,2025-08-01,,,"Åtekasse - 60.388501, 5.290540",Natursteinsmur foran hus,,Åtekasse
+817,324,2025-08-01,,,"Åtekasse - 60.388340, 5.290402",Bak bod,,Åtekasse
+809,325,2025-08-01,,,"Åtekasse - 60.386241, 5.293493",Langs husvegg,,Åtekasse
+809,326,2025-08-01,,,"Åtekasse - 60.386313, 5.293443",Langs husvegg,,Åtekasse
+809,327,2025-08-01,,,"Åtekasse - 60.386274, 5.293488","1m ut fra vegg, mot plen.",,Åtekasse
+809,328,2025-08-01,,,"Åtekasse - 60.386216, 5.293253",Langs mur mot vei,,Åtekasse
+813,329,2025-08-01,,,"Åtekasse - 60.371015, 5.302048","Bakside, mot skog,  79C",,Åtekasse
+813,330,2025-08-01,,,"Åtekasse - 60.371047, 5.301628",Bakside 79D,,Åtekasse
+813,331,2025-08-01,,,"Åtekasse - 60.371100, 5.301153","Kortsiden 79E, under terrasse",,Åtekasse
+813,332,2025-08-01,,,"Åtekasse - 60.371158, 5.300291",Kortside 79G.,,Åtekasse
+813,333,2025-08-01,,,"Åtekasse - 60.371420, 5.301608",Front 79A,,Åtekasse
+778,334,2025-08-05,,,"Åtekasse - 60.267102, 5.334734",Bak garasje,,Åtekasse
+778,335,2025-08-05,,,"Åtekasse - 60.266938, 5.334274",Venstre for inngang,,Åtekasse
+778,336,2025-08-05,,,"Åtekasse - 60.266952, 5.334171","60.266952, 5.334171",,Åtekasse
+778,337,2025-08-05,,,"Åtekasse - 60.266969, 5.334019","60.266969, 5.334019",,Åtekasse
+778,338,2025-08-05,,,"Åtekasse - 60.266885, 5.334030",Husvegg under tak,,Åtekasse
+778,339,2025-08-05,,,"60.266806, 5.334408",Mur kortside,,
+777,340,2025-08-05,,,"Åtekasse - 60.267137, 5.333614",Front av lite uthus.,,Åtekasse
+777,341,2025-08-05,,,"Åtekasse - 60.267210, 5.333337",Bak søppelspann,,Åtekasse
+777,342,2025-08-05,,,"Åtekasse - 60.267131, 5.333258",Bak busk ende av platting,,Åtekasse
+777,343,2025-08-05,,,"60.267085, 5.333430","Bak busk, hjørne av platting",,
+776,344,2025-08-05,,,"Åtekasse - 60.267663, 5.333404","I busk, ved lufting kloakk",,Åtekasse
+776,345,2025-08-05,,,"Åtekasse - 60.267869, 5.333496",Langs gjerde ved innkjørsel,,Åtekasse
+779,346,2025-08-05,,,"Åtekasse - 60.267790, 5.333057",I skråning over steinbelagt vekk,,Åtekasse
+779,347,2025-08-07,,,"Åtekasse - 60.267862, 5.332975",Bak garasje,,Åtekasse
+779,348,2025-08-07,,,"60.267831, 5.332760","Redskapsbod, bak bosspann",,
+779,349,2025-08-07,,,"60.268024, 5.332896",Bak kompostbinge,,
+828,350,2025-08-07,,,"Åtekasse - 60.308015, 5.040172",Nedside natursteinsmur,,Åtekasse
+828,351,2025-08-07,,,"Åtekasse - 60.308217, 5.040573",Ved liten steinknaus,,Åtekasse
+828,352,2025-08-07,,,"Åtekasse - 60.308159, 5.041120",Steinmur bak løe,,Åtekasse
+828,353,2025-08-07,,,"Åtekasse - 60.308120, 5.041131",Steinmur bak løe,,Åtekasse
+828,354,2025-08-07,,,"Åtekasse - 60.307767, 5.041914",I steinmur ved lammefjøs,,Åtekasse
+828,355,2025-08-07,,,"Åtekasse - 60.308030, 5.040707",Natursteinsmur lite uthus,,Åtekasse
+828,356,2025-08-07,,,"Åtekasse - 60.307988, 5.040237",Natursteinsmur ved garasjen,,Åtekasse
+712,357,2025-08-07,,,"Åtekasse - 60.463562, 5.308201",Kortside nr 25,,Åtekasse
+712,358,2025-08-07,,,"Åtekasse - 60.463114, 5.308536",Kortside nr 37,,Åtekasse
+712,359,2025-08-07,,,"Åtekasse - 60.463160, 5.307726","Kortside, oppå mur.",,Åtekasse
+712,360,2025-08-07,,,"Åtekasse - 60.463637, 5.307360","Til høyre, under trapp til platting.",,Åtekasse
+712,361,2025-08-07,,,"Åtekasse - 60.463605, 5.306804",Under bod på kortside. Venstre for dør.,,Åtekasse
+712,362,2025-08-07,,,"Åtekasse - 60.463345, 5.306968","Kortside,  begynnelse av skråpanel.",,Åtekasse
+712,363,2025-08-07,,,"Åtekasse - 60.463209, 5.307060","Kortside, ved varmepumpe.",,Åtekasse
+712,364,2025-08-07,,,"Åtekasse - 60.462518, 5.307646",Bak garasje.,,Åtekasse
+712,365,2025-08-07,,,"Åtekasse - 60.462365, 5.305966","Front, veg mellom 35 og 37",,Åtekasse
+712,366,2025-08-07,,,"Åtekasse - 60.462541, 5.305880",Under trapp til første platting.,,Åtekasse
+712,367,2025-08-07,,,"Åtekasse - 60.462991, 5.305729",Mellom strømskap i hekk.,,Åtekasse
+712,368,2025-08-07,,,"Åtekasse - 60.463305, 5.305612",Kortsiden. Under terrasse på hjørnet.,,Åtekasse
+712,369,2025-08-07,,,"Åtekasse - 60.463542, 5.306176","Under rist, kortside.",,Åtekasse
+6,370,2025-08-07,,,"Kamera - 60.339037, 5.268126",Terrasse,,Kamera
+6,371,2025-08-07,,,"Tilgangsinformasjon - 60.338936, 5.268545",Ved Dør,,Tilgangsinformasjon
+6,372,2025-08-11,,,"Insektslampe - 60.338959, 5.268334","60.338959, 5.268334",,Insektslampe
+6,373,2025-08-11,,,"Limfelle - 60.338921, 5.268518","60.338921, 5.268518",,Limfelle
+6,442,2025-06-27,,,"Åtekasse - 60.338921, 5.268414","60.338921, 5.268414",,Åtekasse
+6,443,2025-06-27,,,"Åtekasse - 60.338757, 5.268227",Luftige,,Åtekasse
+832,444,2025-07-01,,,"Åtekasse - 60.519296, 5.294053",Bak garasje,,Åtekasse
+832,445,2025-07-02,,,"Gassfelle - 60.519248, 5.294050",Hjørne mellom hus og garasje,,Gassfelle
+6,446,2025-07-02,,,"Gassfelle - 60.338772, 5.268395",Under trampoline,,Gassfelle
+774,447,2025-07-31,,,"Åtekasse - 60.267669, 5.333976","Under trapp, bak bod.",,Åtekasse
+774,448,2025-07-31,,,"Åtekasse - 60.267741, 5.334345",Under vedstabel,,Åtekasse
+774,449,2025-07-31,,,"Åtekasse - 60.267776, 5.333743",På husvegg,,Åtekasse
+774,450,2025-07-31,,,"Åtekasse - 60.267664, 5.333778",På husvegg,,Åtekasse
+774,451,2025-07-31,,,"Åtekasse - 60.267771, 5.333520",I hekk.,,Åtekasse
+807,452,2025-08-01,,,"Åtekasse - 60.385740, 5.269943",Bak blomsterpotter ved mur.,,Åtekasse
+807,453,2025-08-01,,,"Åtekasse - 60.385760, 5.269993",Bak skille ved steiner,,Åtekasse
+807,454,2025-08-01,,,"Åtekasse - 60.385793, 5.270040",Utsiden av gjerde ved port.,,Åtekasse
+807,455,2025-08-01,,,"Åtekasse - 60.385812, 5.269977",Under terrasse ved tap,,Åtekasse
+817,456,2025-08-01,,,"Åtekasse - 60.388351, 5.290631",Under trapp ved bod,,Åtekasse
+817,457,2025-08-01,,,"Åtekasse - 60.388501, 5.290540",Natursteinsmur foran hus,,Åtekasse
+817,458,2025-08-01,,,"Åtekasse - 60.388340, 5.290402",Bak bod,,Åtekasse
+809,459,2025-08-01,,,"Åtekasse - 60.386241, 5.293493",Langs husvegg,,Åtekasse
+809,460,2025-08-01,,,"Åtekasse - 60.386313, 5.293443",Langs husvegg,,Åtekasse
+809,461,2025-08-01,,,"Åtekasse - 60.386274, 5.293488","1m ut fra vegg, mot plen.",,Åtekasse
+809,462,2025-08-01,,,"Åtekasse - 60.386216, 5.293253",Langs mur mot vei,,Åtekasse
+813,463,2025-08-01,,,"Åtekasse - 60.371015, 5.302048","Bakside, mot skog,  79C",,Åtekasse
+813,464,2025-08-01,,,"Åtekasse - 60.371047, 5.301628",Bakside 79D,,Åtekasse
+813,465,2025-08-01,,,"Åtekasse - 60.371100, 5.301153","Kortsiden 79E, under terrasse",,Åtekasse
+813,466,2025-08-01,,,"Åtekasse - 60.371158, 5.300291",Kortside 79G.,,Åtekasse
+813,467,2025-08-01,,,"Åtekasse - 60.371420, 5.301608",Front 79A,,Åtekasse
+778,468,2025-08-05,,,"Åtekasse - 60.267102, 5.334734",Bak garasje,,Åtekasse
+778,469,2025-08-05,,,"Åtekasse - 60.266938, 5.334274",Venstre for inngang,,Åtekasse
+778,470,2025-08-05,,,"Åtekasse - 60.266952, 5.334171","60.266952, 5.334171",,Åtekasse
+778,471,2025-08-05,,,"Åtekasse - 60.266969, 5.334019","60.266969, 5.334019",,Åtekasse
+778,472,2025-08-05,,,"Åtekasse - 60.266885, 5.334030",Husvegg under tak,,Åtekasse
+778,473,2025-08-05,,,"60.266806, 5.334408",Mur kortside,,
+777,474,2025-08-05,,,"Åtekasse - 60.267137, 5.333614",Front av lite uthus.,,Åtekasse
+777,475,2025-08-05,,,"Åtekasse - 60.267210, 5.333337",Bak søppelspann,,Åtekasse
+777,476,2025-08-05,,,"Åtekasse - 60.267131, 5.333258",Bak busk ende av platting,,Åtekasse
+777,477,2025-08-05,,,"60.267085, 5.333430","Bak busk, hjørne av platting",,
+776,478,2025-08-05,,,"Åtekasse - 60.267663, 5.333404","I busk, ved lufting kloakk",,Åtekasse
+776,479,2025-08-05,,,"Åtekasse - 60.267869, 5.333496",Langs gjerde ved innkjørsel,,Åtekasse
+779,480,2025-08-05,,,"Åtekasse - 60.267790, 5.333057",I skråning over steinbelagt vekk,,Åtekasse
+779,481,2025-08-07,,,"Åtekasse - 60.267862, 5.332975",Bak garasje,,Åtekasse
+779,482,2025-08-07,,,"60.267831, 5.332760","Redskapsbod, bak bosspann",,
+779,483,2025-08-07,,,"60.268024, 5.332896",Bak kompostbinge,,
+828,484,2025-08-07,,,"Åtekasse - 60.308015, 5.040172",Nedside natursteinsmur,,Åtekasse
+828,485,2025-08-07,,,"Åtekasse - 60.308217, 5.040573",Ved liten steinknaus,,Åtekasse
+828,486,2025-08-07,,,"Åtekasse - 60.308159, 5.041120",Steinmur bak løe,,Åtekasse
+828,487,2025-08-07,,,"Åtekasse - 60.308120, 5.041131",Steinmur bak løe,,Åtekasse
+828,488,2025-08-07,,,"Åtekasse - 60.307767, 5.041914",I steinmur ved lammefjøs,,Åtekasse
+828,489,2025-08-07,,,"Åtekasse - 60.308030, 5.040707",Natursteinsmur lite uthus,,Åtekasse
+828,490,2025-08-07,,,"Åtekasse - 60.307988, 5.040237",Natursteinsmur ved garasjen,,Åtekasse
+712,491,2025-08-07,,,"Åtekasse - 60.463562, 5.308201",Kortside nr 25,,Åtekasse
+712,492,2025-08-07,,,"Åtekasse - 60.463114, 5.308536",Kortside nr 37,,Åtekasse
+712,493,2025-08-07,,,"Åtekasse - 60.463160, 5.307726","Kortside, oppå mur.",,Åtekasse
+712,494,2025-08-07,,,"Åtekasse - 60.463637, 5.307360","Til høyre, under trapp til platting.",,Åtekasse
+712,495,2025-08-07,,,"Åtekasse - 60.463605, 5.306804",Under bod på kortside. Venstre for dør.,,Åtekasse
+712,496,2025-08-07,,,"Åtekasse - 60.463345, 5.306968","Kortside,  begynnelse av skråpanel.",,Åtekasse
+712,497,2025-08-07,,,"Åtekasse - 60.463209, 5.307060","Kortside, ved varmepumpe.",,Åtekasse
+712,498,2025-08-07,,,"Åtekasse - 60.462518, 5.307646",Bak garasje.,,Åtekasse
+712,499,2025-08-07,,,"Åtekasse - 60.462365, 5.305966","Front, veg mellom 35 og 37",,Åtekasse
+712,500,2025-08-07,,,"Åtekasse - 60.462541, 5.305880",Under trapp til første platting.,,Åtekasse
+712,501,2025-08-07,,,"Åtekasse - 60.462991, 5.305729",Mellom strømskap i hekk.,,Åtekasse
+712,502,2025-08-07,,,"Åtekasse - 60.463305, 5.305612",Kortsiden. Under terrasse på hjørnet.,,Åtekasse
+712,503,2025-08-07,,,"Åtekasse - 60.463542, 5.306176","Under rist, kortside.",,Åtekasse
+6,504,2025-08-07,,,"Kamera - 60.339037, 5.268126",Terrasse,,Kamera
+832,578,2025-07-01,,,"Åtekasse - 60.519296, 5.294053",Bak garasje,,Åtekasse
+832,579,2025-07-02,,,"Gassfelle - 60.519248, 5.294050",Hjørne mellom hus og garasje,,Gassfelle
+774,581,2025-07-31,,,"Åtekasse - 60.267669, 5.333976","Under trapp, bak bod.",,Åtekasse
+774,582,2025-07-31,,,"Åtekasse - 60.267741, 5.334345",Under vedstabel,,Åtekasse
+774,583,2025-07-31,,,"Åtekasse - 60.267776, 5.333743",På husvegg,,Åtekasse
+774,584,2025-07-31,,,"Åtekasse - 60.267664, 5.333778",På husvegg,,Åtekasse
+774,585,2025-07-31,,,"Åtekasse - 60.267771, 5.333520",I hekk.,,Åtekasse
+807,586,2025-08-01,,,"Åtekasse - 60.385740, 5.269943",Bak blomsterpotter ved mur.,,Åtekasse
+807,587,2025-08-01,,,"Åtekasse - 60.385760, 5.269993",Bak skille ved steiner,,Åtekasse
+807,588,2025-08-01,,,"Åtekasse - 60.385793, 5.270040",Utsiden av gjerde ved port.,,Åtekasse
+807,589,2025-08-01,,,"Åtekasse - 60.385812, 5.269977",Under terrasse ved tap,,Åtekasse
+817,590,2025-08-01,,,"Åtekasse - 60.388351, 5.290631",Under trapp ved bod,,Åtekasse
+817,591,2025-08-01,,,"Åtekasse - 60.388501, 5.290540",Natursteinsmur foran hus,,Åtekasse
+817,592,2025-08-01,,,"Åtekasse - 60.388340, 5.290402",Bak bod,,Åtekasse
+809,593,2025-08-01,,,"Åtekasse - 60.386241, 5.293493",Langs husvegg,,Åtekasse
+809,594,2025-08-01,,,"Åtekasse - 60.386313, 5.293443",Langs husvegg,,Åtekasse
+809,595,2025-08-01,,,"Åtekasse - 60.386274, 5.293488","1m ut fra vegg, mot plen.",,Åtekasse
+809,596,2025-08-01,,,"Åtekasse - 60.386216, 5.293253",Langs mur mot vei,,Åtekasse
+813,597,2025-08-01,,,"Åtekasse - 60.371015, 5.302048","Bakside, mot skog,  79C",,Åtekasse
+813,598,2025-08-01,,,"Åtekasse - 60.371047, 5.301628",Bakside 79D,,Åtekasse
+813,599,2025-08-01,,,"Åtekasse - 60.371100, 5.301153","Kortsiden 79E, under terrasse",,Åtekasse
+813,600,2025-08-01,,,"Åtekasse - 60.371158, 5.300291",Kortside 79G.,,Åtekasse
+813,601,2025-08-01,,,"Åtekasse - 60.371420, 5.301608",Front 79A,,Åtekasse
+778,602,2025-08-05,,,"Åtekasse - 60.267102, 5.334734",Bak garasje,,Åtekasse
+778,603,2025-08-05,,,"Åtekasse - 60.266938, 5.334274",Venstre for inngang,,Åtekasse
+778,604,2025-08-05,,,"Åtekasse - 60.266952, 5.334171","60.266952, 5.334171",,Åtekasse
+778,605,2025-08-05,,,"Åtekasse - 60.266969, 5.334019","60.266969, 5.334019",,Åtekasse
+778,606,2025-08-05,,,"Åtekasse - 60.266885, 5.334030",Husvegg under tak,,Åtekasse
+778,607,2025-08-05,,,"60.266806, 5.334408",Mur kortside,,
+777,608,2025-08-05,,,"Åtekasse - 60.267137, 5.333614",Front av lite uthus.,,Åtekasse
+777,609,2025-08-05,,,"Åtekasse - 60.267210, 5.333337",Bak søppelspann,,Åtekasse
+777,610,2025-08-05,,,"Åtekasse - 60.267131, 5.333258",Bak busk ende av platting,,Åtekasse
+777,611,2025-08-05,,,"60.267085, 5.333430","Bak busk, hjørne av platting",,
+776,612,2025-08-05,,,"Åtekasse - 60.267663, 5.333404","I busk, ved lufting kloakk",,Åtekasse
+776,613,2025-08-05,,,"Åtekasse - 60.267869, 5.333496",Langs gjerde ved innkjørsel,,Åtekasse
+779,614,2025-08-05,,,"Åtekasse - 60.267790, 5.333057",I skråning over steinbelagt vekk,,Åtekasse
+779,615,2025-08-07,,,"Åtekasse - 60.267862, 5.332975",Bak garasje,,Åtekasse
+779,616,2025-08-07,,,"60.267831, 5.332760","Redskapsbod, bak bosspann",,
+779,617,2025-08-07,,,"60.268024, 5.332896",Bak kompostbinge,,
+828,618,2025-08-07,,,"Åtekasse - 60.308015, 5.040172",Nedside natursteinsmur,,Åtekasse
+828,619,2025-08-07,,,"Åtekasse - 60.308217, 5.040573",Ved liten steinknaus,,Åtekasse
+828,620,2025-08-07,,,"Åtekasse - 60.308159, 5.041120",Steinmur bak løe,,Åtekasse
+828,621,2025-08-07,,,"Åtekasse - 60.308120, 5.041131",Steinmur bak løe,,Åtekasse
+828,622,2025-08-07,,,"Åtekasse - 60.307767, 5.041914",I steinmur ved lammefjøs,,Åtekasse
+828,623,2025-08-07,,,"Åtekasse - 60.308030, 5.040707",Natursteinsmur lite uthus,,Åtekasse
+828,624,2025-08-07,,,"Åtekasse - 60.307988, 5.040237",Natursteinsmur ved garasjen,,Åtekasse
+712,625,2025-08-07,,,"Åtekasse - 60.463562, 5.308201",Kortside nr 25,,Åtekasse
+712,626,2025-08-07,,,"Åtekasse - 60.463114, 5.308536",Kortside nr 37,,Åtekasse
+712,627,2025-08-07,,,"Åtekasse - 60.463160, 5.307726","Kortside, oppå mur.",,Åtekasse
+712,628,2025-08-07,,,"Åtekasse - 60.463637, 5.307360","Til høyre, under trapp til platting.",,Åtekasse
+712,629,2025-08-07,,,"Åtekasse - 60.463605, 5.306804",Under bod på kortside. Venstre for dør.,,Åtekasse
+712,630,2025-08-07,,,"Åtekasse - 60.463345, 5.306968","Kortside,  begynnelse av skråpanel.",,Åtekasse
+712,631,2025-08-07,,,"Åtekasse - 60.463209, 5.307060","Kortside, ved varmepumpe.",,Åtekasse
+712,632,2025-08-07,,,"Åtekasse - 60.462518, 5.307646",Bak garasje.,,Åtekasse
+712,633,2025-08-07,,,"Åtekasse - 60.462365, 5.305966","Front, veg mellom 35 og 37",,Åtekasse
+712,634,2025-08-07,,,"Åtekasse - 60.462541, 5.305880",Under trapp til første platting.,,Åtekasse
+712,635,2025-08-07,,,"Åtekasse - 60.462991, 5.305729",Mellom strømskap i hekk.,,Åtekasse
+712,636,2025-08-07,,,"Åtekasse - 60.463305, 5.305612",Kortsiden. Under terrasse på hjørnet.,,Åtekasse
+712,637,2025-08-07,,,"Åtekasse - 60.463542, 5.306176","Under rist, kortside.",,Åtekasse
+832,645,2025-07-01,,,"Åtekasse - 60.519296, 5.294053",Bak garasje,,Åtekasse
+832,646,2025-07-02,,,"Gassfelle - 60.519248, 5.294050",Hjørne mellom hus og garasje,,Gassfelle
+774,648,2025-07-31,,,"Åtekasse - 60.267669, 5.333976","Under trapp, bak bod.",,Åtekasse
+774,649,2025-07-31,,,"Åtekasse - 60.267741, 5.334345",Under vedstabel,,Åtekasse
+774,650,2025-07-31,,,"Åtekasse - 60.267776, 5.333743",På husvegg,,Åtekasse
+774,651,2025-07-31,,,"Åtekasse - 60.267664, 5.333778",På husvegg,,Åtekasse
+774,652,2025-07-31,,,"Åtekasse - 60.267771, 5.333520",I hekk.,,Åtekasse
+807,653,2025-08-01,,,"Åtekasse - 60.385740, 5.269943",Bak blomsterpotter ved mur.,,Åtekasse
+807,654,2025-08-01,,,"Åtekasse - 60.385760, 5.269993",Bak skille ved steiner,,Åtekasse
+807,655,2025-08-01,,,"Åtekasse - 60.385793, 5.270040",Utsiden av gjerde ved port.,,Åtekasse
+807,656,2025-08-01,,,"Åtekasse - 60.385812, 5.269977",Under terrasse ved tap,,Åtekasse
+817,657,2025-08-01,,,"Åtekasse - 60.388351, 5.290631",Under trapp ved bod,,Åtekasse
+817,658,2025-08-01,,,"Åtekasse - 60.388501, 5.290540",Natursteinsmur foran hus,,Åtekasse
+817,659,2025-08-01,,,"Åtekasse - 60.388340, 5.290402",Bak bod,,Åtekasse
+809,660,2025-08-01,,,"Åtekasse - 60.386241, 5.293493",Langs husvegg,,Åtekasse
+809,661,2025-08-01,,,"Åtekasse - 60.386313, 5.293443",Langs husvegg,,Åtekasse
+809,662,2025-08-01,,,"Åtekasse - 60.386274, 5.293488","1m ut fra vegg, mot plen.",,Åtekasse
+809,663,2025-08-01,,,"Åtekasse - 60.386216, 5.293253",Langs mur mot vei,,Åtekasse
+813,664,2025-08-01,,,"Åtekasse - 60.371015, 5.302048","Bakside, mot skog,  79C",,Åtekasse
+813,665,2025-08-01,,,"Åtekasse - 60.371047, 5.301628",Bakside 79D,,Åtekasse
+813,666,2025-08-01,,,"Åtekasse - 60.371100, 5.301153","Kortsiden 79E, under terrasse",,Åtekasse
+813,667,2025-08-01,,,"Åtekasse - 60.371158, 5.300291",Kortside 79G.,,Åtekasse
+813,668,2025-08-01,,,"Åtekasse - 60.371420, 5.301608",Front 79A,,Åtekasse
+778,669,2025-08-05,,,"Åtekasse - 60.267102, 5.334734",Bak garasje,,Åtekasse
+778,670,2025-08-05,,,"Åtekasse - 60.266938, 5.334274",Venstre for inngang,,Åtekasse
+778,671,2025-08-05,,,"Åtekasse - 60.266952, 5.334171","60.266952, 5.334171",,Åtekasse
+778,672,2025-08-05,,,"Åtekasse - 60.266969, 5.334019","60.266969, 5.334019",,Åtekasse
+778,673,2025-08-05,,,"Åtekasse - 60.266885, 5.334030",Husvegg under tak,,Åtekasse
+778,674,2025-08-05,,,"60.266806, 5.334408",Mur kortside,,
+777,675,2025-08-05,,,"Åtekasse - 60.267137, 5.333614",Front av lite uthus.,,Åtekasse
+777,676,2025-08-05,,,"Åtekasse - 60.267210, 5.333337",Bak søppelspann,,Åtekasse
+777,677,2025-08-05,,,"Åtekasse - 60.267131, 5.333258",Bak busk ende av platting,,Åtekasse
+777,678,2025-08-05,,,"60.267085, 5.333430","Bak busk, hjørne av platting",,
+776,679,2025-08-05,,,"Åtekasse - 60.267663, 5.333404","I busk, ved lufting kloakk",,Åtekasse
+776,680,2025-08-05,,,"Åtekasse - 60.267869, 5.333496",Langs gjerde ved innkjørsel,,Åtekasse
+779,681,2025-08-05,,,"Åtekasse - 60.267790, 5.333057",I skråning over steinbelagt vekk,,Åtekasse
+779,682,2025-08-07,,,"Åtekasse - 60.267862, 5.332975",Bak garasje,,Åtekasse
+779,683,2025-08-07,,,"60.267831, 5.332760","Redskapsbod, bak bosspann",,
+779,684,2025-08-07,,,"60.268024, 5.332896",Bak kompostbinge,,
+828,685,2025-08-07,,,"Åtekasse - 60.308015, 5.040172",Nedside natursteinsmur,,Åtekasse
+828,686,2025-08-07,,,"Åtekasse - 60.308217, 5.040573",Ved liten steinknaus,,Åtekasse
+828,687,2025-08-07,,,"Åtekasse - 60.308159, 5.041120",Steinmur bak løe,,Åtekasse
+828,688,2025-08-07,,,"Åtekasse - 60.308120, 5.041131",Steinmur bak løe,,Åtekasse
+828,689,2025-08-07,,,"Åtekasse - 60.307767, 5.041914",I steinmur ved lammefjøs,,Åtekasse
+828,690,2025-08-07,,,"Åtekasse - 60.308030, 5.040707",Natursteinsmur lite uthus,,Åtekasse
+828,691,2025-08-07,,,"Åtekasse - 60.307988, 5.040237",Natursteinsmur ved garasjen,,Åtekasse
+712,692,2025-08-07,,,"Åtekasse - 60.463562, 5.308201",Kortside nr 25,,Åtekasse
+712,693,2025-08-07,,,"Åtekasse - 60.463114, 5.308536",Kortside nr 37,,Åtekasse
+712,694,2025-08-07,,,"Åtekasse - 60.463160, 5.307726","Kortside, oppå mur.",,Åtekasse
+712,695,2025-08-07,,,"Åtekasse - 60.463637, 5.307360","Til høyre, under trapp til platting.",,Åtekasse
+712,696,2025-08-07,,,"Åtekasse - 60.463605, 5.306804",Under bod på kortside. Venstre for dør.,,Åtekasse
+712,697,2025-08-07,,,"Åtekasse - 60.463345, 5.306968","Kortside,  begynnelse av skråpanel.",,Åtekasse
+712,698,2025-08-07,,,"Åtekasse - 60.463209, 5.307060","Kortside, ved varmepumpe.",,Åtekasse
+712,699,2025-08-07,,,"Åtekasse - 60.462518, 5.307646",Bak garasje.,,Åtekasse
+712,700,2025-08-07,,,"Åtekasse - 60.462365, 5.305966","Front, veg mellom 35 og 37",,Åtekasse
+712,701,2025-08-07,,,"Åtekasse - 60.462541, 5.305880",Under trapp til første platting.,,Åtekasse
+712,702,2025-08-07,,,"Åtekasse - 60.462991, 5.305729",Mellom strømskap i hekk.,,Åtekasse
+712,703,2025-08-07,,,"Åtekasse - 60.463305, 5.305612",Kortsiden. Under terrasse på hjørnet.,,Åtekasse
+712,704,2025-08-07,,,"Åtekasse - 60.463542, 5.306176","Under rist, kortside.",,Åtekasse
+832,712,2025-07-01,,,"Åtekasse - 60.519296, 5.294053",Bak garasje,,Åtekasse
+832,713,2025-07-02,,,"Gassfelle - 60.519248, 5.294050",Hjørne mellom hus og garasje,,Gassfelle
+774,715,2025-07-31,,,"Åtekasse - 60.267669, 5.333976","Under trapp, bak bod.",,Åtekasse
+774,716,2025-07-31,,,"Åtekasse - 60.267741, 5.334345",Under vedstabel,,Åtekasse
+774,717,2025-07-31,,,"Åtekasse - 60.267776, 5.333743",På husvegg,,Åtekasse
+774,718,2025-07-31,,,"Åtekasse - 60.267664, 5.333778",På husvegg,,Åtekasse
+774,719,2025-07-31,,,"Åtekasse - 60.267771, 5.333520",I hekk.,,Åtekasse
+807,720,2025-08-01,,,"Åtekasse - 60.385740, 5.269943",Bak blomsterpotter ved mur.,,Åtekasse
+807,721,2025-08-01,,,"Åtekasse - 60.385760, 5.269993",Bak skille ved steiner,,Åtekasse
+807,722,2025-08-01,,,"Åtekasse - 60.385793, 5.270040",Utsiden av gjerde ved port.,,Åtekasse
+807,723,2025-08-01,,,"Åtekasse - 60.385812, 5.269977",Under terrasse ved tap,,Åtekasse
+817,724,2025-08-01,,,"Åtekasse - 60.388351, 5.290631",Under trapp ved bod,,Åtekasse
+817,725,2025-08-01,,,"Åtekasse - 60.388501, 5.290540",Natursteinsmur foran hus,,Åtekasse
+817,726,2025-08-01,,,"Åtekasse - 60.388340, 5.290402",Bak bod,,Åtekasse
+809,727,2025-08-01,,,"Åtekasse - 60.386241, 5.293493",Langs husvegg,,Åtekasse
+809,728,2025-08-01,,,"Åtekasse - 60.386313, 5.293443",Langs husvegg,,Åtekasse
+809,729,2025-08-01,,,"Åtekasse - 60.386274, 5.293488","1m ut fra vegg, mot plen.",,Åtekasse
+809,730,2025-08-01,,,"Åtekasse - 60.386216, 5.293253",Langs mur mot vei,,Åtekasse
+813,731,2025-08-01,,,"Åtekasse - 60.371015, 5.302048","Bakside, mot skog,  79C",,Åtekasse
+813,732,2025-08-01,,,"Åtekasse - 60.371047, 5.301628",Bakside 79D,,Åtekasse
+813,733,2025-08-01,,,"Åtekasse - 60.371100, 5.301153","Kortsiden 79E, under terrasse",,Åtekasse
+813,734,2025-08-01,,,"Åtekasse - 60.371158, 5.300291",Kortside 79G.,,Åtekasse
+813,735,2025-08-01,,,"Åtekasse - 60.371420, 5.301608",Front 79A,,Åtekasse
+778,736,2025-08-05,,,"Åtekasse - 60.267102, 5.334734",Bak garasje,,Åtekasse
+778,737,2025-08-05,,,"Åtekasse - 60.266938, 5.334274",Venstre for inngang,,Åtekasse
+778,738,2025-08-05,,,"Åtekasse - 60.266952, 5.334171","60.266952, 5.334171",,Åtekasse
+778,739,2025-08-05,,,"Åtekasse - 60.266969, 5.334019","60.266969, 5.334019",,Åtekasse
+778,740,2025-08-05,,,"Åtekasse - 60.266885, 5.334030",Husvegg under tak,,Åtekasse
+778,741,2025-08-05,,,"60.266806, 5.334408",Mur kortside,,
+777,742,2025-08-05,,,"Åtekasse - 60.267137, 5.333614",Front av lite uthus.,,Åtekasse
+777,743,2025-08-05,,,"Åtekasse - 60.267210, 5.333337",Bak søppelspann,,Åtekasse
+777,744,2025-08-05,,,"Åtekasse - 60.267131, 5.333258",Bak busk ende av platting,,Åtekasse
+777,745,2025-08-05,,,"60.267085, 5.333430","Bak busk, hjørne av platting",,
+776,746,2025-08-05,,,"Åtekasse - 60.267663, 5.333404","I busk, ved lufting kloakk",,Åtekasse
+776,747,2025-08-05,,,"Åtekasse - 60.267869, 5.333496",Langs gjerde ved innkjørsel,,Åtekasse
+779,748,2025-08-05,,,"Åtekasse - 60.267790, 5.333057",I skråning over steinbelagt vekk,,Åtekasse
+779,749,2025-08-07,,,"Åtekasse - 60.267862, 5.332975",Bak garasje,,Åtekasse
+779,750,2025-08-07,,,"60.267831, 5.332760","Redskapsbod, bak bosspann",,
+779,751,2025-08-07,,,"60.268024, 5.332896",Bak kompostbinge,,
+828,752,2025-08-07,,,"Åtekasse - 60.308015, 5.040172",Nedside natursteinsmur,,Åtekasse
+828,753,2025-08-07,,,"Åtekasse - 60.308217, 5.040573",Ved liten steinknaus,,Åtekasse
+828,754,2025-08-07,,,"Åtekasse - 60.308159, 5.041120",Steinmur bak løe,,Åtekasse
+828,755,2025-08-07,,,"Åtekasse - 60.308120, 5.041131",Steinmur bak løe,,Åtekasse
+828,756,2025-08-07,,,"Åtekasse - 60.307767, 5.041914",I steinmur ved lammefjøs,,Åtekasse
+828,757,2025-08-07,,,"Åtekasse - 60.308030, 5.040707",Natursteinsmur lite uthus,,Åtekasse
+828,758,2025-08-07,,,"Åtekasse - 60.307988, 5.040237",Natursteinsmur ved garasjen,,Åtekasse
+712,759,2025-08-07,,,"Åtekasse - 60.463562, 5.308201",Kortside nr 25,,Åtekasse
+712,760,2025-08-07,,,"Åtekasse - 60.463114, 5.308536",Kortside nr 37,,Åtekasse
+712,761,2025-08-07,,,"Åtekasse - 60.463160, 5.307726","Kortside, oppå mur.",,Åtekasse
+712,762,2025-08-07,,,"Åtekasse - 60.463637, 5.307360","Til høyre, under trapp til platting.",,Åtekasse
+712,763,2025-08-07,,,"Åtekasse - 60.463605, 5.306804",Under bod på kortside. Venstre for dør.,,Åtekasse
+712,764,2025-08-07,,,"Åtekasse - 60.463345, 5.306968","Kortside,  begynnelse av skråpanel.",,Åtekasse
+712,765,2025-08-07,,,"Åtekasse - 60.463209, 5.307060","Kortside, ved varmepumpe.",,Åtekasse
+712,766,2025-08-07,,,"Åtekasse - 60.462518, 5.307646",Bak garasje.,,Åtekasse
+712,767,2025-08-07,,,"Åtekasse - 60.462365, 5.305966","Front, veg mellom 35 og 37",,Åtekasse
+712,768,2025-08-07,,,"Åtekasse - 60.462541, 5.305880",Under trapp til første platting.,,Åtekasse
+712,769,2025-08-07,,,"Åtekasse - 60.462991, 5.305729",Mellom strømskap i hekk.,,Åtekasse
+712,770,2025-08-07,,,"Åtekasse - 60.463305, 5.305612",Kortsiden. Under terrasse på hjørnet.,,Åtekasse
+712,771,2025-08-07,,,"Åtekasse - 60.463542, 5.306176","Under rist, kortside.",,Åtekasse

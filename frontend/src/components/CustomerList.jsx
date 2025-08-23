@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CustomersAPI, EquipmentAPI, VisitsAPI, ServiceLogsAPI } from '../api';
+import Button from './ui/Button';
+import Card from './ui/Card';
+import { Loading, ErrorState } from './ui/States';
 
 const CustomerList = () => {
   const [customers, setCustomers] = useState([]);
@@ -11,8 +14,9 @@ const CustomerList = () => {
       try {
         const data = await CustomersAPI.list();
         setCustomers(data);
-      } catch (err) {
-        setError('Kunne ikke hente kunder. ' + err.message);
+      } catch (e) {
+        console.debug(e)
+        setError('Kunne ikke hente kunder. ' + (e?.message || String(e)));
       } finally {
         setLoading(false);
       }
@@ -25,7 +29,7 @@ const CustomerList = () => {
     if (customers.length && !selectedCustomerId) {
       setSelectedCustomerId(customers[0].id);
     }
-  }, [customers]);
+  }, [customers, selectedCustomerId]);
 
   const [newCustomer, setNewCustomer] = useState({ name: '', address: '' });
   const [creating, setCreating] = useState(false);
@@ -36,8 +40,9 @@ const CustomerList = () => {
       setCustomers(prev => [...prev, created]);
       setNewCustomer({ name: '', address: '' });
       setSelectedCustomerId(created.id);
-    } catch (err) {
-      setError('Kunne ikke opprette kunde. ' + err.message);
+    } catch (e) {
+      console.debug(e)
+      setError('Kunne ikke opprette kunde. ' + (e?.message || String(e)));
     } finally {
       setCreating(false);
     }
@@ -58,7 +63,7 @@ const CustomerList = () => {
         const logs = await ServiceLogsAPI.list({ customer_id: selectedCustomerId });
         setServiceLogs(logs);
       } catch (e) {
-        // ignore
+        console.debug(e)
       }
     };
     if (selectedCustomerId) fetchLists();
@@ -73,7 +78,7 @@ const CustomerList = () => {
       setEquipments(prev => [...prev, created]);
       setNewEquipment({ name: '', type: '' });
     } catch (e) {
-      // ignore in demo
+      console.debug(e)
     }
   };
   const createVisit = async () => {
@@ -83,36 +88,31 @@ const CustomerList = () => {
       setVisits(prev => [created, ...prev]);
       setNewVisit({ visit_date: '', technician: '' });
     } catch (e) {
-      // ignore in demo
+      console.debug(e)
     }
   };
 
-  if (loading) {
-    return <div>Laster...</div>;
-  }
+  if (loading) return <Loading />
 
-  if (error) {
-    return <div>Feil: {error}</div>;
-  }
+  if (error) return <ErrorState message={error} />
 
   return (
     <div>
       <h1 style={{margin:'8px 0 12px'}}>Kundeliste</h1>
-    <div className="card" style={{marginBottom: 16}}>
-        <h3>Ny kunde</h3>
+    <Card title="Ny kunde" style={{marginBottom: 16}}>
         <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
           <input placeholder="Navn" value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer, name:e.target.value})} />
           <input placeholder="Adresse" value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer, address:e.target.value})} />
-      <button className="btn btn-primary" onClick={createCustomer} disabled={creating || !newCustomer.name}>Opprett</button>
+      <Button variant="primary" onClick={createCustomer} disabled={creating || !newCustomer.name}>Opprett</Button>
         </div>
-      </div>
+      </Card>
 
       <div className="layout-columns">
         <div className="col">
           <h2>Kunder</h2>
           <ul className="list">
             {customers.map((customer) => (
-              <li key={customer.id} style={{cursor:'pointer'}} onClick={()=>setSelectedCustomerId(customer.id)}>
+              <li key={customer.id} style={{cursor:'pointer'}} onClick={()=>{ setSelectedCustomerId(customer.id); window.location.hash = `customer:${customer.id}` }}>
                 <span style={{fontWeight: selectedCustomerId===customer.id?'bold':'normal'}}>{customer.name}</span>
               </li>
             ))}
@@ -121,13 +121,13 @@ const CustomerList = () => {
 
         <div className="col" style={{flex: 2}}>
           <h2>Besøk for valgt kunde</h2>
-      <div className="card" style={{marginBottom: 16}}>
+      <Card style={{marginBottom: 16}}>
             <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
               <input placeholder="YYYY-MM-DDTHH:mm:ss" value={newVisit.visit_date} onChange={e=>setNewVisit({...newVisit, visit_date:e.target.value})} />
               <input placeholder="Tekniker" value={newVisit.technician} onChange={e=>setNewVisit({...newVisit, technician:e.target.value})} />
-        <button className="btn btn-primary" onClick={createVisit} disabled={!firstCustomerId || !newVisit.visit_date}>Opprett</button>
+        <Button variant="primary" onClick={createVisit} disabled={!firstCustomerId || !newVisit.visit_date}>Opprett</Button>
             </div>
-          </div>
+          </Card>
           <ul>
             {visits.map((v) => (
               <li key={v.id}>{v.visit_date} {v.technician ? `— ${v.technician}` : ''}</li>
@@ -144,13 +144,13 @@ const CustomerList = () => {
 
         <div className="col">
           <h2>Utstyr (alle)</h2>
-      <div className="card" style={{marginBottom: 16}}>
+      <Card style={{marginBottom: 16}}>
             <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
               <input placeholder="Navn" value={newEquipment.name} onChange={e=>setNewEquipment({...newEquipment, name:e.target.value})} />
               <input placeholder="Type" value={newEquipment.type} onChange={e=>setNewEquipment({...newEquipment, type:e.target.value})} />
-        <button className="btn btn-primary" onClick={createEquipment} disabled={!firstCustomerId || !newEquipment.name}>Opprett</button>
+        <Button variant="primary" onClick={createEquipment} disabled={!firstCustomerId || !newEquipment.name}>Opprett</Button>
             </div>
-          </div>
+          </Card>
           <ul>
             {equipments.map((e) => (
               <li key={e.id}>{e.name} ({e.type || '–'})</li>

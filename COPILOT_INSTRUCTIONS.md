@@ -53,3 +53,7 @@ Når jeg ber om en ny rute i Flask, skal Copilot:
 > Copilot skal alltid anta at brukeren ønsker å lære, ikke bare få ferdig kode.
 
 Terminal er PowerShell, husk riktig syntaks for PowerShell kommandoer
+
+Følg opp source control i GitHub. Bruker er ukjent med bruk av GitHub
+
+Rydd alltid opp i ESlint errors.

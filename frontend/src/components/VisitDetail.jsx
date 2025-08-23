@@ -1,23 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { VisitsAPI } from '../api'
+import Button from './ui/Button'
+import Card from './ui/Card'
+import { Loading, Empty } from './ui/States'
+import { useToast } from './ui/Toast.jsx'
 import { RequireAuth } from './auth'
 
 export default function VisitDetail({ visitId }){
   return (
     <RequireAuth>
-      <_Inner visitId={visitId} />
+  <Inner visitId={visitId} />
     </RequireAuth>
   )
 }
 
-function _Inner({ visitId }){
+function Inner({ visitId }){
+  const toast = useToast()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [logForm, setLogForm] = useState({ equipment_id: '', description: '', hours_worked: '' })
   const [summary, setSummary] = useState('')
   const [checklist, setChecklist] = useState({ sjekk_advarselskilt: false, sjekk_agnstasjoner: false, sjekk_inngangspunkter: false, sjekk_fellefangst: false })
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try{
       const d = await VisitsAPI.detail(visitId)
@@ -32,10 +37,10 @@ function _Inner({ visitId }){
     } finally{
       setLoading(false)
     }
-  }
-  useEffect(()=>{ load() }, [visitId])
+  }, [visitId])
+  useEffect(()=>{ load() }, [load])
 
-  if (loading) return <div>Laster besøk…</div>
+  if (loading) return <Loading>Laster besøk…</Loading>
   if (!data) return <div>Ikke funnet.</div>
 
   const v = data.visit
@@ -49,31 +54,33 @@ function _Inner({ visitId }){
       description: logForm.description,
       hours_worked: logForm.hours_worked ? Number(logForm.hours_worked) : undefined,
     }
-    await VisitsAPI.logs.create(visitId, payload)
+  await VisitsAPI.logs.create(visitId, payload)
     setLogForm({ equipment_id: '', description: '', hours_worked: '' })
+  toast.push({ variant: 'success', title: 'Logg lagret' })
     await load()
   }
 
   const start = async () => {
-    await VisitsAPI.start(visitId)
+  await VisitsAPI.start(visitId)
+  toast.push({ variant: 'info', title: 'Besøk startet' })
     await load()
   }
 
   const complete = async () => {
-    await VisitsAPI.complete(visitId, { summary, checklist })
+  await VisitsAPI.complete(visitId, { summary, checklist })
+  toast.push({ variant: 'success', title: 'Besøk fullført' })
     await load()
   }
 
   return (
     <div className="stack" style={{gap:16}}>
-      <div className="card">
-        <h3>Besøksdetalj</h3>
+      <Card title="Besøksdetalj">
         <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>
         <div>Status: {v.status || 'Planlagt'}</div>
-        {canStart && <button className="btn primary" onClick={start} style={{marginTop:8}}>Start</button>}
-      </div>
+        {canStart && <Button variant="primary" onClick={start} style={{marginTop:8}}>Start</Button>}
+      </Card>
 
-      <div className="card">
+      <Card>
         <h4>Utstyr hos kunde</h4>
         <ul>
           {data.equipment.map(e => (
@@ -82,9 +89,9 @@ function _Inner({ visitId }){
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
 
-      <div className="card">
+      <Card>
         <h4>Legg til logg</h4>
         <form onSubmit={addLog} className="stack" style={{gap:8}}>
           <select className="input" value={logForm.equipment_id} onChange={e=> setLogForm(f=>({...f, equipment_id: e.target.value}))} required>
@@ -95,11 +102,11 @@ function _Inner({ visitId }){
           </select>
           <textarea className="input" placeholder="Beskrivelse" value={logForm.description} onChange={e=> setLogForm(f=>({...f, description: e.target.value}))} required />
           <input className="input" type="number" min="0" step="0.25" placeholder="Timer brukt (valgfritt)" value={logForm.hours_worked} onChange={e=> setLogForm(f=>({...f, hours_worked: e.target.value}))} />
-          <button className="btn" type="submit">Lagre logg</button>
+          <Button type="submit">Lagre logg</Button>
         </form>
-      </div>
+      </Card>
 
-      <div className="card">
+      <Card>
         <h4>Oppsummering og sjekkliste</h4>
         <textarea className="input" placeholder="Oppsummering" value={summary} onChange={e=> setSummary(e.target.value)} />
         <div className="list" style={{marginTop:8}}>
@@ -110,19 +117,19 @@ function _Inner({ visitId }){
             </label>
           ))}
         </div>
-        {canComplete && <button className="btn success" onClick={complete} style={{marginTop:8}}>Fullfør besøk</button>}
-      </div>
+        {canComplete && <Button variant="success" onClick={complete} style={{marginTop:8}}>Fullfør besøk</Button>}
+      </Card>
 
-      <div className="card">
+      <Card>
         <h4>Logger</h4>
-        {!data.logs?.length ? <div>Ingen logger ennå.</div> : (
+        {!data.logs?.length ? <Empty>Ingen logger ennå.</Empty> : (
           <ul>
             {data.logs.map(l => (
               <li key={l.id}>{new Date(l.log_date || v.visit_date).toLocaleString()} — {l.description} {l.hours_worked ? `(${l.hours_worked}t)` : ''}</li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

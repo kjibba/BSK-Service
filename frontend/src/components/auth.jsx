@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { AuthAPI } from '../api'
-
-const AuthCtx = createContext(null)
+import { AuthCtx } from './authContext'
 
 export function AuthProvider({ children }){
   const [user, setUser] = useState(null)
@@ -25,7 +24,7 @@ export function AuthProvider({ children }){
     }
   }
   const logout = async () => {
-    try { await AuthAPI.logout() } catch (e) { /* swallow */ }
+    try { await AuthAPI.logout() } catch (e) { console.debug(e) }
     setUser(null)
   }
 
@@ -36,13 +35,9 @@ export function AuthProvider({ children }){
   )
 }
 
-export function useAuth(){
-  const ctx = useContext(AuthCtx)
-  return ctx
-}
-
 export function RequireAuth({ children }){
-  const { user, ready, login } = useAuth()
+  // Use the context directly here to avoid circular imports
+  const { user, ready, login } = useContext(AuthCtx) || { user: null, ready: false, login: async () => {} }
   const [email, setEmail] = useState('')
   if (!ready) return <div>Laster…</div>
   if (!user) {
@@ -50,7 +45,7 @@ export function RequireAuth({ children }){
       <div className="card" style={{maxWidth:420, margin:'0 auto'}}>
         <h3>Logg inn</h3>
         <p>Skriv inn din e-post for å starte.</p>
-        <form onSubmit={(e)=>{e.preventDefault(); login(email)}}>
+        <form onSubmit={(_e)=>{_e.preventDefault(); login(email)}}>
           <input className="input" type="email" placeholder="epost@firma.no" value={email} onChange={e=>setEmail(e.target.value)} required />
           <button className="btn primary" type="submit" style={{marginTop:12}}>Logg inn</button>
         </form>

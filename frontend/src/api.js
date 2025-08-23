@@ -12,11 +12,14 @@ export const CustomersAPI = {
   create: (payload) => api.post('/customers', payload).then(r => r.data),
   update: (id, payload) => api.put(`/customers/${id}`, payload).then(r => r.data),
   fixGeo: (id, lat, lng) => api.post(`/customers/${id}/fix-geo`, { latitude: lat, longitude: lng }).then(r => r.data),
+  detail: (id) => api.get(`/customers/${id}/detail`).then(r => r.data),
 }
 
 export const EquipmentAPI = {
-  list: () => api.get('/equipment').then(r => r.data),
+  list: (params) => api.get('/equipment', { params }).then(r => r.data),
   create: (payload) => api.post('/equipment', payload).then(r => r.data),
+  update: (id, payload) => api.put(`/equipment/${id}`, payload).then(r => r.data),
+  delete: (id) => api.delete(`/equipment/${id}`).then(r => r.data),
 }
 
 export const VisitsAPI = {
@@ -51,4 +54,11 @@ export const AuthAPI = {
 export const EmployeesAPI = {
   list: () => api.get('/employees').then(r => r.data),
   update: (id, payload) => api.put(`/employees/${id}`, payload).then(r => r.data),
+}
+
+export const EquipmentTypesAPI = {
+  list: () => api.get('/equipment-types').then(r => r.data),
+  create: (payload) => api.post('/equipment-types', payload).then(r => r.data),
+  update: (id, payload) => api.put(`/equipment-types/${id}`, payload).then(r => r.data),
+  delete: (id) => api.delete(`/equipment-types/${id}`).then(r => r.data),
 }

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { VisitsAPI, EmployeesAPI } from '../api'
-import { RequireAuth, useAuth } from './auth'
+import { RequireAuth } from './auth'
+import { useAuth } from './hooks/useAuth'
+import Button from './ui/Button'
+import { Loading, Empty } from './ui/States'
 
 export default function MyMissions(){
   return (
     <RequireAuth>
-      <_Inner />
+  <Inner />
     </RequireAuth>
   )
 }
@@ -25,7 +28,7 @@ function AssignRow({ visit, emps, onAssign }){
   )
 }
 
-function _Inner(){
+function Inner(){
   const { user } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -49,8 +52,8 @@ function _Inner(){
     window.location.hash = `visit:${id}`
   }
 
-  if (loading) return <div>Laster oppdrag…</div>
-  if (!items.length) return <div>Ingen planlagte besøk.</div>
+  if (loading) return <Loading>Laster oppdrag…</Loading>
+  if (!items.length) return <Empty>Ingen planlagte besøk.</Empty>
 
   return (
     <div className="list">
@@ -68,9 +71,9 @@ function _Inner(){
             )}
           </div>
           <div style={{display:'flex', gap:8}}>
-            <button className="btn" onClick={()=> window.location.hash = `visit:${v.id}`}>Åpne</button>
+            <Button onClick={()=> window.location.hash = `visit:${v.id}`}>Åpne</Button>
             {(v.status === 'Planlagt' || !v.status) && (
-              <button className="btn primary" onClick={()=> startVisit(v.id)}>Start</button>
+              <Button variant="primary" onClick={()=> startVisit(v.id)}>Start</Button>
             )}
           </div>
         </div>

@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
 import { EmployeesAPI } from '../api'
-import { RequireAuth, useAuth } from './auth'
+import Button from './ui/Button'
+import Card from './ui/Card'
+import { Loading, ErrorState } from './ui/States'
+import { useToast } from './ui/Toast.jsx'
+import { RequireAuth } from './auth'
+import { useAuth } from './hooks/useAuth'
 
 export default function Employees(){
   return (
     <RequireAuth>
-      <_Inner />
+  <Inner />
     </RequireAuth>
   )
 }
 
-function _Inner(){
+function Inner(){
   const { user } = useAuth()
+  const toast = useToast()
   const isManager = user?.role === 'manager'
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -32,34 +38,31 @@ function _Inner(){
   useEffect(()=>{ load() }, [])
 
   if (!isManager) return <div>Kun leder kan endre roller.</div>
-  if (loading) return <div>Laster ansatte…</div>
-  if (error) return (
-    <div className="card" style={{maxWidth:600}}>
-      <h3>Ansatte</h3>
-      <p style={{color:'#b91c1c'}}>Kunne ikke laste ansatte ({error}). Er du innlogget som leder?</p>
-      <div style={{display:'flex', gap:8}}>
-        <button className="btn" onClick={load}>Prøv igjen</button>
-      </div>
-    </div>
-  )
+  if (loading) return <Loading>Laster ansatte…</Loading>
+  if (error) return <ErrorState message={`Kunne ikke laste ansatte (${error}). Er du innlogget som leder?`} onRetry={load} />
 
   const updateRole = async (id, role) => {
-    await EmployeesAPI.update(id, { role })
-    await load()
+    try{
+      await EmployeesAPI.update(id, { role })
+      toast.push({ variant: 'success', title: 'Oppdatert', description: 'Rolle endret.' })
+      await load()
+    } catch (_e) {
+      console.debug(_e)
+      toast.push({ variant: 'error', title: 'Feil', description: 'Kunne ikke oppdatere rolle.' })
+    }
   }
 
   return (
-    <div className="card">
-      <h3>Ansatte</h3>
+    <Card title="Ansatte">
       <p style={{marginTop:0, color:'#64748b'}}>Fant {items.length} ansatte.</p>
       <ul className="list">
-        {items.map(e => (
-          <li key={e.id} style={{display:'flex', alignItems:'center', gap:12}}>
+        {items.map(it => (
+          <li key={it.id} style={{display:'flex', alignItems:'center', gap:12}}>
             <div style={{flex:1}}>
-              <div><strong>{e.name || e.email}</strong></div>
-              <div style={{opacity:.7}}>{e.email}</div>
+              <div><strong>{it.name || it.email}</strong></div>
+              <div style={{opacity:.7}}>{it.email}</div>
             </div>
-            <select className="input" value={e.role || ''} onChange={ev=> updateRole(e.id, ev.target.value)}>
+            <select className="input" value={it.role || ''} onChange={ev=> updateRole(it.id, ev.target.value)}>
               <option value="">(ingen rolle)</option>
               <option value="technician">Tekniker</option>
               <option value="manager">Leder</option>
@@ -70,6 +73,6 @@ function _Inner(){
           <li style={{opacity:.7}}>Ingen ansatte å vise.</li>
         )}
       </ul>
-    </div>
+    </Card>
   )
 }

@@ -95,14 +95,17 @@ class Equipment(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(100))
+    equipment_type_id = db.Column(db.Integer, db.ForeignKey('equipment_types.id'), index=True)
     serial_number = db.Column(db.String(100))
     installed_at = db.Column(db.Date)
     notes = db.Column(db.Text)
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
+    properties = db.Column(db.JSON)
 
     # Relationships
     customer = db.relationship("Customer", back_populates="equipment")
+    equipment_type = db.relationship("EquipmentType")
     service_logs = db.relationship("ServiceLog", back_populates="equipment_item", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -114,11 +117,34 @@ class Equipment(db.Model):
             'customer_id': self.customer_id,
             'name': self.name,
             'type': self.type,
+            'equipment_type_id': self.equipment_type_id,
             'serial_number': self.serial_number,
             'installed_at': self.installed_at.isoformat() if self.installed_at else None,
             'notes': self.notes,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'properties': self.properties,
+        }
+
+
+class EquipmentType(db.Model):
+    __tablename__ = 'equipment_types'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    # fields: JSON array describing properties for this equipment type, e.g.
+    # [{"key":"bait","label":"Åte","type":"select","options":["gift","giftfritt"]}, ...]
+    fields = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return f"<EquipmentType {self.name}>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'fields': self.fields,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
 class ServiceLog(db.Model):

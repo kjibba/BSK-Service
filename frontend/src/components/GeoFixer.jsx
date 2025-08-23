@@ -93,7 +93,7 @@ export default function GeoFixer(){
     });
     markerRef.current = m;
     map.setView([currLat, currLng], c.latitude && c.longitude ? Math.max(map.getZoom(), 15) : 12);
-  }, [selectedId]);
+  }, [selectedId, selected]);
 
   const save = async () => {
     setError(null); setOk(''); setSaving(true);

@@ -1,13 +1,18 @@
 import './App.css';
-import CustomerList from './components/CustomerList.jsx';
-import MapView from './components/MapView.jsx';
-import MyMissions from './components/MyMissions.jsx';
-import VisitDetail from './components/VisitDetail.jsx';
-import { AuthProvider, useAuth } from './components/auth.jsx';
-import Employees from './components/Employees.jsx';
-import Login from './components/Login.jsx';
+import { AuthProvider } from './components/auth.jsx';
+import { useAuth } from './components/hooks/useAuth'
+import { ToastProvider } from './components/ui/Toast.jsx'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
-import { useEffect, useState } from 'react';
+// Lazy-load pages/components that are relatively heavy
+const CustomerList = lazy(() => import('./components/CustomerList.jsx'))
+const MapView = lazy(() => import('./components/MapView.jsx'))
+const MyMissions = lazy(() => import('./components/MyMissions.jsx'))
+const VisitDetail = lazy(() => import('./components/VisitDetail.jsx'))
+const Employees = lazy(() => import('./components/Employees.jsx'))
+const EquipmentTypesManager = lazy(() => import('./components/EquipmentTypesManager.jsx'))
+const CustomerDetail = lazy(() => import('./components/CustomerDetail.jsx'))
+const Login = lazy(() => import('./components/Login.jsx'))
 
 function App() {
   const [route, setRoute] = useState(() => {
@@ -20,36 +25,58 @@ function App() {
       return 'customers';
     }
   });
+  const mainRef = useRef(null)
   useEffect(() => {
     const onHash = () => setRoute(window.location.hash.slice(1));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  // Move focus to main on route change for accessibility
+  useEffect(() => {
+    const el = mainRef.current
+    if (el) {
+      // ensure focus after render
+      setTimeout(() => {
+      try { el.focus({ preventScroll: true }) } catch (e) { console.debug(e) }
+      }, 0)
+    }
+  }, [route])
   const isMap = route === 'map';
   const isMissions = route === 'missions';
   const isVisit = route.startsWith('visit:');
   const visitId = isVisit ? Number(route.split(':')[1]) : null;
   const isEmployees = route === 'employees';
+  const isEquipTypes = route === 'equipment-types';
+  const isCustomer = route.startsWith('customer:');
+  const customerId = isCustomer ? Number(route.split(':')[1]) : null;
   const isLogin = route === 'login';
   return (
-    <AuthProvider>
-    <div>
-  <SiteHeader />
+  <AuthProvider>
+  <ToastProvider>
+  <div>
+  <a href="#main" className="sr-only sr-only-focusable">Hopp til innhold</a>
+  <SiteHeader route={route} />
   <Hero />
-      <main className="container" style={{padding:'2rem 1rem'}}>
-        {isVisit ? (
-          <VisitDetail visitId={visitId} />
-        ) : isMissions ? (
-          <MyMissions />
-        ) : isEmployees ? (
-          <Employees />
-        ) : isLogin ? (
-          <Login />
-        ) : isMap ? (
-          <MapView />
-        ) : (
-          <CustomerList />
-        )}
+      <main id="main" ref={mainRef} tabIndex={-1} className="container" style={{padding:'2rem 1rem'}}>
+        <Suspense fallback={<p>Laster…</p>}>
+          {isVisit ? (
+            <VisitDetail visitId={visitId} />
+          ) : isCustomer ? (
+            <CustomerDetail customerId={customerId} />
+          ) : isMissions ? (
+            <MyMissions />
+          ) : isEmployees ? (
+            <Employees />
+          ) : isEquipTypes ? (
+            <EquipmentTypesManager />
+          ) : isLogin ? (
+            <Login />
+          ) : isMap ? (
+            <MapView />
+          ) : (
+            <CustomerList />
+          )}
+        </Suspense>
       </main>
       {/* Mobile bottom tab bar */}
       <div className="bottom-tabbar">
@@ -61,15 +88,17 @@ function App() {
       </div>
       <SiteFooter />
     </div>
+    </ToastProvider>
     </AuthProvider>
   );
 }
 
 export default App;
 
-function SiteHeader(){
+function SiteHeader({ route }){
   const { user } = useAuth()
   const isManager = user?.role === 'manager'
+  const active = (r) => (route === r ? 'active' : '')
   return (
   <header className="site-header">
       <div className="container" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0.75rem 1rem'}}>
@@ -77,13 +106,16 @@ function SiteHeader(){
           <img src="/logo.png" alt="Bergen Skadedyrkontroll AS" style={{height:36}} />
           <span>Bergen Skadedyrkontroll — Service</span>
         </div>
-        <nav className="nav">
-          <a href="#customers" className="nav-link">Kunder</a>
-          <a href="#map" className="nav-link">Kart</a>
-          <a href="#missions" className="nav-link mobile-hide">Mine oppdrag</a>
-          {isManager && <a href="#employees" className="nav-link mobile-hide">Ansatte</a>}
+        {/* On mobile, hide the nav links for compactness; keep them on desktop */}
+        <nav className="nav mobile-hide">
+          <a href="#customers" className={`nav-link ${active('customers')}`} aria-current={route==='customers' ? 'page' : undefined}>Kunder</a>
+          <a href="#map" className={`nav-link ${active('map')}`} aria-current={route==='map' ? 'page' : undefined}>Kart</a>
+          <a href="#missions" className={`nav-link ${active('missions')}`} aria-current={route==='missions' ? 'page' : undefined}>Mine oppdrag</a>
+          {isManager && <a href="#employees" className={`nav-link mobile-hide ${active('employees')}`} aria-current={route==='employees' ? 'page' : undefined}>Ansatte</a>}
+          {isManager && <a href="#equipment-types" className={`nav-link mobile-hide ${active('equipment-types')}`} aria-current={route==='equipment-types' ? 'page' : undefined}>Utstyrstyper</a>}
         </nav>
-        <a href="#login" className="nav-link login-link">Logg inn</a>
+        {/* On mobile, only show login/user at top-right for cleanliness. Replace text with username when logged in. */}
+        <a href="#login" className="nav-link login-link">{user ? (user.name || user.email || 'Min profil') : 'Logg inn'}</a>
       </div>
     </header>
   )

@@ -70,9 +70,18 @@ export default function MapView() {
     const ensureGoogle = () => new Promise((resolve) => {
       if (window.google && window.google.maps) return resolve();
       if (!key) return resolve();
+      // Reuse existing script if present to avoid duplicate loads
+      const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (existing) {
+        if (window.google && window.google.maps) return resolve();
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => resolve(), { once: true });
+        return;
+      }
       const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
       s.async = true;
+      s.defer = true;
       s.onload = () => resolve();
       s.onerror = () => resolve(); // fail-soft: just skip Google layers
       document.head.appendChild(s);
@@ -86,6 +95,15 @@ export default function MapView() {
         activeBaseRef.current = 'google_sat';
         // Keep references to toggle later
         layerCtrlRef.current = { gRoad, gSat };
+        setBaseReady(true);
+      } else {
+        // Fallback: ensure a usable base map even without Google
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19,
+        });
+        osm.addTo(map);
+        layerCtrlRef.current = { osm };
         setBaseReady(true);
       }
     });
@@ -112,7 +130,7 @@ export default function MapView() {
       const icon = status === 'green' ? greenIcon : status === 'yellow' ? yellowIcon : redIcon;
       const m = L.marker([c.latitude, c.longitude], { icon });
       const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
-      const html = `<div style="min-width:200px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px">Neste service: ${nextText}</div></div>`;
+  const html = `<div style="min-width:200px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px">Neste service: ${nextText}</div><div style="margin-top:6px"><a href="#customer:${c.id}">Åpne kundekort</a></div></div>`;
       m.bindPopup(html);
       m.addTo(group);
     });
@@ -136,7 +154,7 @@ export default function MapView() {
 
   return (
     <div className="map-wrapper">
-      {baseReady && (
+  {baseReady && layerCtrlRef.current && layerCtrlRef.current.gRoad && layerCtrlRef.current.gSat && (
         <div className="map-toggle">
           <button
             className={activeBaseRef.current === 'google_sat' ? 'active' : ''}
