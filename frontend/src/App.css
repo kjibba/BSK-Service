@@ -1,0 +1,261 @@
+/* Design tokens */
+:root {
+  --brand: #0f172a;
+  --brand-600: #0b1221;
+  --accent: #2563eb;
+  --text: #0f172a;
+  --muted: #475569;
+  --bg: #ffffff;
+  --surface: #f8fafc;
+  --border: #e2e8f0;
+  --radius: 10px;
+  --shadow: 0 6px 24px rgba(2, 6, 23, 0.08);
+}
+
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Prevent accidental horizontal overflow on small devices */
+html, body { box-sizing: border-box; }
+*, *:before, *:after { box-sizing: inherit; }
+body { overflow-x: hidden; }
+
+
+.container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+.surface {
+  background: var(--surface);
+}
+
+/* Typography */
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 0.5rem; }
+h2 { font-size: 1.25rem; line-height: 1.3; margin: 0.75rem 0 0.35rem; }
+h3 { font-size: 1.1rem; line-height: 1.3; margin: 0.75rem 0 0.35rem; color: var(--muted); }
+p { color: var(--muted); }
+
+/* Header/Nav */
+.site-header {
+  background: #ffffff !important; /* force white header so dark logo stands out on all devices */
+  color: var(--text);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border);
+  overflow-x: hidden;
+}
+.brand { font-weight: 800; letter-spacing: 0.3px; }
+.nav { display: flex; gap: 12px; align-items: center; flex-wrap: nowrap; }
+.nav-link { color: var(--text); padding: 6px 8px; border-radius: 8px; }
+.nav-link:hover { background: #f1f5f9; text-decoration: none; }
+
+/* Login link pinned to top-right */
+.login-link {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--text);
+}
+.login-link:hover { background: #f1f5f9; }
+
+/* Header/logo responsive tweaks */
+.site-header .brand img { height: 36px; width: auto; display: block; }
+.site-header .brand span { display: inline-block; vertical-align: middle; }
+/* On smaller screens, truncate long brand text so it doesn't force horizontal scroll */
+@media (max-width: 640px) {
+  .site-header .brand span {
+    max-width: calc(100vw - 120px); /* leave room for logo and nav */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .site-header .container { padding-left: 12px; padding-right: 12px; }
+  /* Allow nav to wrap to next line instead of forcing horizontal scroll */
+  .nav { flex-wrap: wrap; gap: 6px; }
+  /* Reduce padding in header container to help fit narrow viewports */
+  .site-header .container { padding: 0.5rem 0.75rem; }
+  /* Ensure header background remains white on small screens */
+  .site-header { background: #fff !important; }
+
+  /* Mobile: place logo above the brand text */
+  .site-header .brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .site-header .brand img { height: 44px; }
+  .site-header .brand span { text-align: center; max-width: 100%; white-space: normal; }
+  /* Adjust login link position for stacked header */
+  .login-link { position: static; margin-top: 6px; }
+}
+@media (max-width: 640px) {
+  .mobile-hide { display: none !important; }
+}
+
+/* Layout helpers */
+.layout-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .layout-columns {
+    flex-direction: row;
+    gap: 24px;
+  }
+}
+.col { flex: 1 1 0; }
+
+/* Forms */
+input, button, select {
+  font-size: 16px; /* avoid iOS zoom */
+}
+input, select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+button[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* Button variants */
+.btn { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 8px; padding: 8px 12px; }
+.btn:hover { background: #f1f5f9; }
+.btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.btn-primary:hover { background: var(--brand-600); }
+.btn-ghost { background: transparent; border-color: var(--border); }
+.btn-ghost:hover { background: rgba(2,6,23,0.06); }
+.btn-outline { background: transparent; color: var(--brand); border-color: var(--brand); }
+.btn-sm { padding: 6px 8px; font-size: 12px; border-radius: 6px; }
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+/* Map container responsive height */
+.map-container {
+  height: 72vh;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+@media (max-width: 640px) {
+  .map-container {
+    height: 85vh;
+  }
+}
+
+/* Map legend overlay */
+.map-wrapper { position: relative; }
+.map-legend {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 400; /* above tiles */
+}
+.map-legend .dot { display:inline-block; width:10px; height:10px; border-radius:999px; margin-right:4px; }
+
+/* Compact basemap toggle */
+.map-toggle {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: flex;
+  gap: 6px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 401;
+}
+.map-toggle button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #0f172a;
+}
+.map-toggle button.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+/* Bottom tab bar for mobile */
+.bottom-tabbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1000;
+  background: #ffffff;
+  border-top: 1px solid var(--border);
+}
+.bottom-tabbar .inner {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+}
+.tab-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font-weight: 600;
+  color: #334155;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.tab-btn.active { color: #0f172a; background: #e2e8f0; }
+@media (min-width: 900px) {
+  .bottom-tabbar { display: none; }
+}
+
+/* Lists */
+.list { list-style: none; padding: 0; margin: 0; }
+.list li { padding: 6px 4px; border-bottom: 1px dashed var(--border); }
+.list li:last-child { border-bottom: 0; }
+
+/* Hero */
+.hero { background: linear-gradient(180deg, var(--surface), transparent); }

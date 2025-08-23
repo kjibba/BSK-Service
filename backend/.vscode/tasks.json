@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "flask db migrate add vpy/start_date",
+			"type": "shell",
+			"command": "venv2\\Scripts\\python.exe -m flask db migrate -m \"add visits_per_year and start_date to customer\"",
+			"group": "build"
+		}
+	]
+}
