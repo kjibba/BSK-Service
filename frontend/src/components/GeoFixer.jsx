@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CustomersAPI, MapAPI } from '../api';
+import Button from './ui/Button';
 
 // Simple compact marker for dragging
 const dragIcon = L.divIcon({ className: 'drag-marker', html: '<div style="width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #0f172a"></div>', iconSize: [18,18], iconAnchor: [9,9] });
@@ -135,7 +136,14 @@ export default function GeoFixer(){
         <span style={{fontSize:12, color:'#475569'}}>Viser {filtered.length} av {customers.length}</span>
         <input style={{maxWidth:140}} placeholder="Lat" value={lat} onChange={e=>setLat(e.target.value)} />
         <input style={{maxWidth:160}} placeholder="Lng" value={lng} onChange={e=>setLng(e.target.value)} />
-        <button onClick={save} disabled={!selectedId || saving}>Lagre</button>
+        <Button 
+          onClick={save} 
+          disabled={!selectedId} 
+          loading={saving}
+          ariaLabel="Lagre nye koordinater for valgt kunde"
+        >
+          Lagre
+        </Button>
       </div>
       {error && <div style={{color:'#b91c1c', marginTop:8}}>Feil: {error}</div>}
       {ok && <div style={{color:'#166534', marginTop:8}}>{ok}</div>}

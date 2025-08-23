@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { VisitsAPI } from '../api'
 import { RequireAuth } from './auth'
+import Button from './ui/Button'
 
 export default function VisitDetail({ visitId }){
   return (
@@ -16,6 +17,9 @@ function _Inner({ visitId }){
   const [logForm, setLogForm] = useState({ equipment_id: '', description: '', hours_worked: '' })
   const [summary, setSummary] = useState('')
   const [checklist, setChecklist] = useState({ sjekk_advarselskilt: false, sjekk_agnstasjoner: false, sjekk_inngangspunkter: false, sjekk_fellefangst: false })
+  const [startingVisit, setStartingVisit] = useState(false)
+  const [completingVisit, setCompletingVisit] = useState(false)
+  const [addingLog, setAddingLog] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -44,24 +48,39 @@ function _Inner({ visitId }){
 
   const addLog = async (e) => {
     e.preventDefault()
-    const payload = {
-      equipment_id: Number(logForm.equipment_id),
-      description: logForm.description,
-      hours_worked: logForm.hours_worked ? Number(logForm.hours_worked) : undefined,
+    setAddingLog(true)
+    try {
+      const payload = {
+        equipment_id: Number(logForm.equipment_id),
+        description: logForm.description,
+        hours_worked: logForm.hours_worked ? Number(logForm.hours_worked) : undefined,
+      }
+      await VisitsAPI.logs.create(visitId, payload)
+      setLogForm({ equipment_id: '', description: '', hours_worked: '' })
+      await load()
+    } finally {
+      setAddingLog(false)
     }
-    await VisitsAPI.logs.create(visitId, payload)
-    setLogForm({ equipment_id: '', description: '', hours_worked: '' })
-    await load()
   }
 
   const start = async () => {
-    await VisitsAPI.start(visitId)
-    await load()
+    setStartingVisit(true)
+    try {
+      await VisitsAPI.start(visitId)
+      await load()
+    } finally {
+      setStartingVisit(false)
+    }
   }
 
   const complete = async () => {
-    await VisitsAPI.complete(visitId, { summary, checklist })
-    await load()
+    setCompletingVisit(true)
+    try {
+      await VisitsAPI.complete(visitId, { summary, checklist })
+      await load()
+    } finally {
+      setCompletingVisit(false)
+    }
   }
 
   return (
@@ -70,7 +89,17 @@ function _Inner({ visitId }){
         <h3>Besøksdetalj</h3>
         <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>
         <div>Status: {v.status || 'Planlagt'}</div>
-        {canStart && <button className="btn primary" onClick={start} style={{marginTop:8}}>Start</button>}
+        {canStart && (
+          <Button 
+            variant="primary" 
+            onClick={start} 
+            loading={startingVisit}
+            style={{marginTop:8}}
+            ariaLabel="Start besøket"
+          >
+            Start
+          </Button>
+        )}
       </div>
 
       <div className="card">
@@ -95,7 +124,13 @@ function _Inner({ visitId }){
           </select>
           <textarea className="input" placeholder="Beskrivelse" value={logForm.description} onChange={e=> setLogForm(f=>({...f, description: e.target.value}))} required />
           <input className="input" type="number" min="0" step="0.25" placeholder="Timer brukt (valgfritt)" value={logForm.hours_worked} onChange={e=> setLogForm(f=>({...f, hours_worked: e.target.value}))} />
-          <button className="btn" type="submit">Lagre logg</button>
+          <Button 
+            type="submit" 
+            loading={addingLog}
+            ariaLabel="Lagre logg for valgt utstyr"
+          >
+            Lagre logg
+          </Button>
         </form>
       </div>
 
@@ -110,7 +145,17 @@ function _Inner({ visitId }){
             </label>
           ))}
         </div>
-        {canComplete && <button className="btn success" onClick={complete} style={{marginTop:8}}>Fullfør besøk</button>}
+        {canComplete && (
+          <Button 
+            variant="success" 
+            onClick={complete} 
+            loading={completingVisit}
+            style={{marginTop:8}}
+            ariaLabel="Fullfør besøket og lagre oppsummering"
+          >
+            Fullfør besøk
+          </Button>
+        )}
       </div>
 
       <div className="card">
