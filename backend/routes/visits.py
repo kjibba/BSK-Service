@@ -25,12 +25,11 @@ def list_create_visit():
         data = request.get_json() or {}
         if not data.get('customer_id') or not data.get('visit_date'):
             return jsonify({'error': 'customer_id and visit_date are required'}), 400
-        item = Visit(
-            customer_id=data['customer_id'],
-            visit_date=_parse_dt(data['visit_date']),
-            technician=data.get('technician'),
-            notes=data.get('notes'),
-        )
+        item = Visit()
+        item.customer_id = data['customer_id']
+        item.visit_date = _parse_dt(data['visit_date'])
+        item.technician = data.get('technician')
+        item.notes = data.get('notes')
         db.session.add(item)
         db.session.commit()
         return jsonify(item.to_dict()), 201

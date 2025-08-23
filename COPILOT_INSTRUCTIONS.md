@@ -51,3 +51,5 @@ Når jeg ber om en ny rute i Flask, skal Copilot:
 
 > **Merk:** Disse instruksjonene gjelder for hele prosjektet.  
 > Copilot skal alltid anta at brukeren ønsker å lære, ikke bare få ferdig kode.
+
+Terminal er PowerShell, husk riktig syntaks for PowerShell kommandoer

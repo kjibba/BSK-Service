@@ -13,7 +13,7 @@ def load_input(path: str) -> Dict[str, pd.DataFrame]:
         x = pd.ExcelFile(path)
         for sheet in x.sheet_names:
             df = x.parse(sheet)
-            tables[sheet.strip()] = df
+            tables[str(sheet).strip()] = df
     elif ext == '.csv':
         name = os.path.basename(path).rsplit('.', 1)[0]
         tables[name] = pd.read_csv(path)
@@ -36,7 +36,7 @@ def is_date_series(s: pd.Series) -> bool:
     # If values look like dates (no time component) for a sample
     try:
         dt = pd.to_datetime(s.dropna().head(50))
-        return all(x.time().hour == 0 and x.time().minute == 0 and x.time().second == 0 for x in dt)
+        return all(x.hour == 0 and x.minute == 0 and x.second == 0 for x in dt)
     except Exception:
         return False
 

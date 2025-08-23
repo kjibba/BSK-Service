@@ -30,14 +30,13 @@ def list_create_equipment():
         data = request.get_json() or {}
         if not data.get('name') or not data.get('customer_id'):
             return jsonify({'error': 'name and customer_id are required'}), 400
-        item = Equipment(
-            customer_id=data['customer_id'],
-            name=data['name'],
-            type=data.get('type'),
-            serial_number=data.get('serial_number'),
-            installed_at=_parse_date(data.get('installed_at')),
-            notes=data.get('notes'),
-        )
+        item = Equipment()
+        item.customer_id = data['customer_id']
+        item.name = data['name']
+        item.type = data.get('type')
+        item.serial_number = data.get('serial_number')
+        item.installed_at = _parse_date(data.get('installed_at'))
+        item.notes = data.get('notes')
         db.session.add(item)
         db.session.commit()
         return jsonify(item.to_dict()), 201
@@ -63,3 +62,5 @@ def equipment_detail(equipment_id: int):
     db.session.delete(item)
     db.session.commit()
     return jsonify({'message': 'Equipment deleted'})
+
+# Equipment model is imported from backend.models, so no need to redefine it here.
