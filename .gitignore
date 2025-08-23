@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.env.local
+.venv/
+.venv*/
+venv/
+venv*/
+
+# Virtualenvs inside repo
+backend/venv2/
+.venv/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Vite / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# DB / exports / backups
+*.sqlite3
+*.db
+*.sql
+data/*.xlsx
+data/*.bak

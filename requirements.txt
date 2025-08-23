@@ -1,0 +1,8 @@
+Flask>=2.2
+Flask-Login
+Flask-Migrate
+Flask-CORS
+Flask-SQLAlchemy
+PyMySQL
+alembic
+requests
