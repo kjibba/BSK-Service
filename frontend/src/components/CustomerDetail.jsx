@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { CustomersAPI, EquipmentAPI, EquipmentTypesAPI } from '../api'
+import { CustomersAPI, EquipmentAPI, EquipmentTypesAPI, VisitsAPI, EmployeesAPI, MaterialsAPI } from '../api'
 import Card from './ui/Card'
 import Button from './ui/Button'
 import { Loading, Empty, ErrorState } from './ui/States'
@@ -35,6 +35,7 @@ export default function CustomerDetail({ customerId }) {
   const [showEditCustomer, setShowEditCustomer] = useState(false)
   const [showVisits, setShowVisits] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+  const [creatingVisit, setCreatingVisit] = useState(false)
 
   const load = useCallback(async (opts) => {
     const silent = !!(opts && opts.silent)
@@ -200,7 +201,7 @@ export default function CustomerDetail({ customerId }) {
       cm.bindPopup(`<div><strong>${customer?.name || ''}</strong><div>${customer?.address || ''}</div></div>`)
     }
 
-    const equipment = (data.equipment || []).map(e => {
+  const equipment = (data.equipment || []).map(e => {
       const lat = toNum(e.latitude); const lng = toNum(e.longitude)
       return { ...e, _lat: lat, _lng: lng }
     })
@@ -248,10 +249,13 @@ export default function CustomerDetail({ customerId }) {
     try { m.openPopup() } catch (e) { console.debug(e) }
     }
 
+    // Detect active visit for this customer to enable direct service links
+    const activeVisit = (data.visits || []).find(v => (v.status === 'Planlagt' || v.status === 'Pågående'))
     equipment.forEach(e => {
       if (e._lat == null || e._lng == null) return
       const m = L.marker([e._lat, e._lng])
-      const html = `<div><strong>${e.name || ''}</strong><div style="margin-top:6px;display:flex;gap:6px"><button type='button' class='btn-move' data-id='${e.id}' data-lat='${e._lat}' data-lng='${e._lng}' style='padding:4px 8px'>Flytt</button><button type='button' class='btn-edit' data-id='${e.id}' style='padding:4px 8px'>Rediger</button><button type='button' class='btn-del' data-id='${e.id}' style='padding:4px 8px'>Slett</button></div></div>`
+      const svcLink = activeVisit ? `<a href="#service:${activeVisit.id}:${e.id}" class="btn-open-service" style="padding:4px 8px">Utfør service</a>` : ''
+      const html = `<div><strong>${e.name || ''}</strong><div style=\"font-size:12px;color:#475569\">${e.type || ''}</div><div style=\"margin-top:6px;display:flex;gap:6px;flex-wrap:wrap\">${svcLink}<button type='button' class='btn-move' data-id='${e.id}' data-lat='${e._lat}' data-lng='${e._lng}' style='padding:4px 8px'>Flytt</button><button type='button' class='btn-edit' data-id='${e.id}' style='padding:4px 8px'>Rediger</button><button type='button' class='btn-del' data-id='${e.id}' style='padding:4px 8px'>Slett</button></div></div>`
       m.bindPopup(html)
       m.on('popupopen', (ev) => {
         const root = ev.popup.getElement()
@@ -325,6 +329,25 @@ export default function CustomerDetail({ customerId }) {
           <div>Kontakt: {customer.contact_person || '-'}</div>
           <div>E-post: {customer.email || '-'} · Telefon: {customer.phone || '-'}</div>
         </div>
+        <div style={{ marginTop: 10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          {(() => {
+            const active = (data.visits || []).find(v => (v.status === 'Planlagt' || v.status === 'Pågående'))
+            if (active) {
+              return (
+                <>
+                  <Button type="button" variant="primary" onClick={() => window.location.hash = `visit:${active.id}`}>Oppdrag {active.status?.toLowerCase() === 'pågående' ? 'pågår' : 'planlagt'} — åpne</Button>
+                  <span style={{ fontSize:12, color:'#475569' }}>Dato: {active.visit_date ? new Date(active.visit_date).toLocaleString() : '-'}</span>
+                </>
+              )
+            }
+            return (<Button type="button" onClick={() => setCreatingVisit(v => !v)}>+ Nytt oppdrag</Button>)
+          })()}
+        </div>
+        {creatingVisit && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e2e8f0' }}>
+            <CreateVisitInline customerId={customerId} onCreated={(v) => { setCreatingVisit(false); if (v && v.id) window.location.hash = `visit:${v.id}` }} />
+          </div>
+        )}
       </Card>
 
       <Card title="Rediger kunde">
@@ -401,7 +424,7 @@ export default function CustomerDetail({ customerId }) {
                       const notesInput = root.querySelector('.new-eq-notes')
                       const photoInput = root.querySelector('.new-eq-photo')
 
-                      const renderProps = (typeObj) => {
+                      const renderProps = async (typeObj) => {
                         if (!propsBox) return
                         const fields = (typeObj && Array.isArray(typeObj.fields)) ? typeObj.fields : []
                         if (!fields.length) { propsBox.innerHTML = ''; return }
@@ -422,7 +445,41 @@ export default function CustomerDetail({ customerId }) {
                             parts.push(`<label style="display:block;margin:6px 0">${label}<input type="${itype}"${step} class="prop-${key}" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label>`)
                           }
                         })
-                        propsBox.innerHTML = parts.join('')
+                        // If Åtekasse, render bait config controls on top
+                        let baitHtml = ''
+                        try {
+                          const isBaitBox = (typeObj?.name || '').toLowerCase().includes('åtekasse')
+                          if (isBaitBox) {
+                            // Fetch materials lists
+                            const [poisons, nonpoisons] = await Promise.all([
+                              window.__materialsGift || MaterialsAPI.list('Giftåte').then(r => (window.__materialsGift = r)),
+                              window.__materialsGiftfritt || MaterialsAPI.list('Giftfritt Åte').then(r => (window.__materialsGiftfritt = r)),
+                            ])
+                            const opt = (arr) => (arr||[]).map(m => `<option value="${m.id}">${m.name}</option>`).join('')
+                            baitHtml = `
+                              <fieldset style="margin:6px 0;padding:8px;border:1px solid #e2e8f0;border-radius:6px">
+                                <legend style="font-size:12px;color:#475569">Åte-konfigurasjon</legend>
+                                <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" class="prop-inneholder_giftaate" /> <span>Inneholder Giftåte</span></label>
+                                <div class="bait-poison" style="display:none;margin-left:14px">
+                                  <label style="display:block;margin:6px 0">Standard Giftåte<select class="prop-standard_giftaate_id" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">Velg…</option>${opt(poisons)}</select></label>
+                                </div>
+                                <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" class="prop-inneholder_giftfritt_aate" /> <span>Inneholder Giftfritt Åte</span></label>
+                                <div class="bait-nonpoison" style="display:none;margin-left:14px">
+                                  <label style="display:block;margin:6px 0">Standard Giftfritt Åte<select class="prop-standard_giftfritt_aate_id" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">Velg…</option>${opt(nonpoisons)}</select></label>
+                                </div>
+                              </fieldset>`
+                          }
+                        } catch (e) { console.debug(e) }
+                        propsBox.innerHTML = baitHtml + parts.join('')
+                        // wire bait toggles
+                        try {
+                          const pChk = propsBox.querySelector('.prop-inneholder_giftaate')
+                          const pBox = propsBox.querySelector('.bait-poison')
+                          if (pChk && pBox) pChk.addEventListener('change', ()=> { pBox.style.display = pChk.checked ? 'block' : 'none' })
+                          const npChk = propsBox.querySelector('.prop-inneholder_giftfritt_aate')
+                          const npBox = propsBox.querySelector('.bait-nonpoison')
+                          if (npChk && npBox) npChk.addEventListener('change', ()=> { npBox.style.display = npChk.checked ? 'block' : 'none' })
+                        } catch(e){ console.debug(e) }
                       }
 
                       const populateTypes = async () => {
@@ -473,7 +530,7 @@ export default function CustomerDetail({ customerId }) {
                         const types = typesRef.current || []
                         const typeObj = (types || []).find(t => t.id === typeId)
                         const properties = {}
-                        if (typeObj && Array.isArray(typeObj.fields)) {
+                          if (typeObj && Array.isArray(typeObj.fields)) {
                           typeObj.fields.forEach(f => {
                             const key = (f.key || '').trim()
                             if (!key) return
@@ -485,6 +542,13 @@ export default function CustomerDetail({ customerId }) {
                             else properties[key] = el.value
                           })
                         }
+                          // Save bait config into properties if present
+                          try {
+                            const pChk = root.querySelector('.prop-inneholder_giftaate'); if (pChk) properties.inneholder_giftaate = !!pChk.checked
+                            const pSel = root.querySelector('.prop-standard_giftaate_id'); if (pSel && pSel.value) properties.standard_giftaate_id = Number(pSel.value)
+                            const npChk = root.querySelector('.prop-inneholder_giftfritt_aate'); if (npChk) properties.inneholder_giftfritt_aate = !!npChk.checked
+                            const npSel = root.querySelector('.prop-standard_giftfritt_aate_id'); if (npSel && npSel.value) properties.standard_giftfritt_aate_id = Number(npSel.value)
+                          } catch (e) { console.debug(e) }
                         const ll = m.getLatLng()
                         try {
                           const payload = { customer_id: customerId, name, latitude: ll.lat, longitude: ll.lng }
@@ -605,6 +669,54 @@ export default function CustomerDetail({ customerId }) {
 
       <div>
         <Button onClick={() => window.history.back()}>Tilbake</Button>
+      </div>
+    </div>
+  )
+}
+
+function CreateVisitInline({ customerId, onCreated }){
+  const [date, setDate] = useState(() => {
+    try {
+      const now = new Date();
+      return new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16)
+    } catch { return '' }
+  })
+  const [notes, setNotes] = useState('')
+  const [techs, setTechs] = useState([])
+  const [techId, setTechId] = useState('')
+  const [loading, setLoading] = useState(false)
+  useEffect(() => { (async ()=>{ try { setTechs(await EmployeesAPI.list()) } catch {} })() }, [])
+  const save = async () => {
+    if (!date) return alert('Velg dato/tid')
+    setLoading(true)
+    try {
+      const payload = { customer_id: customerId, visit_date: new Date(date).toISOString(), notes: notes || undefined }
+      if (techId) payload.assigned_technician_id = Number(techId)
+      const v = await VisitsAPI.office.create(payload)
+      onCreated && onCreated(v)
+    } catch (e) {
+      alert('Kunne ikke opprette oppdrag')
+    } finally { setLoading(false) }
+  }
+  return (
+    <div style={{ display:'grid', gap:8, gridTemplateColumns:'1fr 1fr', alignItems:'end' }}>
+      <label className="stack" style={{ gap:4 }}>
+        <div>Dato og tid</div>
+        <input className="input" type="datetime-local" value={date} onChange={e=> setDate(e.target.value)} />
+      </label>
+      <label className="stack" style={{ gap:4 }}>
+        <div>Tekniker</div>
+        <select className="input" value={techId} onChange={e=> setTechId(e.target.value)}>
+          <option value="">(ingen)</option>
+          {(techs||[]).map(t => <option key={t.id} value={t.id}>{t.name || t.email}</option>)}
+        </select>
+      </label>
+      <label className="stack" style={{ gap:4, gridColumn:'1 / -1' }}>
+        <div>Notat</div>
+        <input className="input" value={notes} onChange={e=> setNotes(e.target.value)} placeholder="Telefonoppdrag, hastejobb…" />
+      </label>
+      <div style={{ display:'flex', gap:8, gridColumn:'1 / -1', justifyContent:'flex-end' }}>
+        <Button type="button" onClick={save} disabled={loading}>{loading ? 'Oppretter…' : 'Opprett oppdrag'}</Button>
       </div>
     </div>
   )

@@ -2,16 +2,18 @@ import './App.css';
 import { AuthProvider } from './components/auth.jsx';
 import { useAuth } from './components/hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast.jsx'
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
 
 // Lazy-load pages/components that are relatively heavy
 const CustomerList = lazy(() => import('./components/CustomerList.jsx'))
 const MapView = lazy(() => import('./components/MapView.jsx'))
 const MyMissions = lazy(() => import('./components/MyMissions.jsx'))
 const VisitDetail = lazy(() => import('./components/VisitDetail.jsx'))
+const EquipmentService = lazy(() => import('./components/EquipmentService.jsx'))
 const Employees = lazy(() => import('./components/Employees.jsx'))
 const EquipmentTypesManager = lazy(() => import('./components/EquipmentTypesManager.jsx'))
 const CustomerDetail = lazy(() => import('./components/CustomerDetail.jsx'))
+const FeedbackAdmin = lazy(() => import('./components/FeedbackAdmin.jsx'))
 const Login = lazy(() => import('./components/Login.jsx'))
 
 function App() {
@@ -45,8 +47,15 @@ function App() {
   const isMissions = route === 'missions';
   const isVisit = route.startsWith('visit:');
   const visitId = isVisit ? Number(route.split(':')[1]) : null;
+  const isService = route.startsWith('service:');
+  const [serviceVisitId, serviceEquipmentId] = useMemo(() => {
+    if (!isService) return [null, null];
+    const parts = route.split(':');
+    return [Number(parts[1]), Number(parts[2])];
+  }, [route]);
   const isEmployees = route === 'employees';
   const isEquipTypes = route === 'equipment-types';
+  const isFeedbackAdmin = route === 'feedback'
   const isCustomer = route.startsWith('customer:');
   const customerId = isCustomer ? Number(route.split(':')[1]) : null;
   const isLogin = route === 'login';
@@ -59,7 +68,9 @@ function App() {
   <Hero />
       <main id="main" ref={mainRef} tabIndex={-1} className="container" style={{padding:'2rem 1rem'}}>
         <Suspense fallback={<p>Laster…</p>}>
-          {isVisit ? (
+          {isService ? (
+            <EquipmentService visitId={serviceVisitId} equipmentId={serviceEquipmentId} />
+          ) : isVisit ? (
             <VisitDetail visitId={visitId} />
           ) : isCustomer ? (
             <CustomerDetail customerId={customerId} />
@@ -69,6 +80,8 @@ function App() {
             <Employees />
           ) : isEquipTypes ? (
             <EquipmentTypesManager />
+          ) : isFeedbackAdmin ? (
+            <FeedbackAdmin />
           ) : isLogin ? (
             <Login />
           ) : isMap ? (
@@ -113,6 +126,7 @@ function SiteHeader({ route }){
           <a href="#missions" className={`nav-link ${active('missions')}`} aria-current={route==='missions' ? 'page' : undefined}>Mine oppdrag</a>
           {isManager && <a href="#employees" className={`nav-link mobile-hide ${active('employees')}`} aria-current={route==='employees' ? 'page' : undefined}>Ansatte</a>}
           {isManager && <a href="#equipment-types" className={`nav-link mobile-hide ${active('equipment-types')}`} aria-current={route==='equipment-types' ? 'page' : undefined}>Utstyrstyper</a>}
+          {isManager && <a href="#feedback" className={`nav-link mobile-hide ${active('feedback')}`} aria-current={route==='feedback' ? 'page' : undefined}>Feedback</a>}
         </nav>
         {/* On mobile, only show login/user at top-right for cleanliness. Replace text with username when logged in. */}
         <a href="#login" className="nav-link login-link">{user ? (user.name || user.email || 'Min profil') : 'Logg inn'}</a>

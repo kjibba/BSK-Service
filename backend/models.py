@@ -165,7 +165,7 @@ class ServiceLog(db.Model):
         return f"<ServiceLog {self.id}>"
 
     def to_dict(self):
-        return {
+        obj = {
             'id': self.id,
             'visit_id': self.visit_id,
             'equipment_id': self.equipment_id,
@@ -173,6 +173,33 @@ class ServiceLog(db.Model):
             'description': self.description,
             'hours_worked': self.hours_worked,
         }
+        # Include material usages if loaded
+        try:
+            usages = []
+            materials_used_rel = getattr(self, 'materials_used', None)  # type: ignore[attr-defined]
+            seq = []
+            try:
+                seq = list(materials_used_rel) if materials_used_rel is not None else []
+            except Exception:
+                seq = []
+            for u in seq:
+                item = u.to_dict()
+                try:
+                    if u.material is not None:
+                        item['material'] = {
+                            'id': u.material.id,
+                            'name': u.material.name,
+                            'material_type': u.material.material_type,
+                            'active_ingredient': u.material.active_ingredient,
+                            'standard_amount': u.material.standard_amount,
+                        }
+                except Exception:
+                    pass
+                usages.append(item)
+            obj['materials_used'] = usages
+        except Exception:
+            pass
+        return obj
 
 
 class DailyTask(db.Model):
@@ -295,4 +322,37 @@ class Photo(db.Model):
             'visit_id': self.visit_id,
             'image_url': self.image_url,
             'description': self.description,
+        }
+
+
+class Feedback(db.Model):
+    __tablename__ = 'feedback'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True, index=True)
+    user_email = db.Column(db.String(200))
+    text = db.Column(db.Text)
+    context = db.Column(db.JSON)
+    diagnostics = db.Column(db.JSON)
+    status = db.Column(db.String(30), default='open', index=True)  # open, in_progress, closed
+    handler_note = db.Column(db.Text)
+    handled_by = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=True)
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return f"<Feedback {self.id} {self.status}>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_email': self.user_email,
+            'text': self.text,
+            'context': self.context,
+            'diagnostics': self.diagnostics,
+            'status': self.status,
+            'handler_note': self.handler_note,
+            'handled_by': self.handled_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

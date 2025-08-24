@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from backend.extensions import db
-from backend.models import ServiceLog, Visit, Equipment
+from backend.models import ServiceLog, Visit, Equipment, MaterialUsage
 from datetime import datetime
 
 bp = Blueprint('service_logs', __name__, url_prefix='/api/service-logs')
@@ -73,6 +73,48 @@ def service_log_detail(log_id: int):
             item.description = data['description']
         if 'hours_worked' in data:
             item.hours_worked = data['hours_worked']
+        # Optional: replace materials usage if provided
+        def _get(dct, *keys):
+            for k in keys:
+                if k in dct:
+                    return dct.get(k)
+            return None
+        materials_used_payload = data.get('materials_used')
+        poison = data.get('poison_bait') or {}
+        nonpoison = data.get('nonpoison_bait') or {}
+        replace_materials = bool(isinstance(materials_used_payload, list) or poison or nonpoison)
+        if replace_materials:
+            try:
+                # delete existing
+                for u in list(item.materials_used or []):
+                    db.session.delete(u)
+                db.session.flush()
+            except Exception:
+                pass
+            def add_usage(material_id, amount):
+                try:
+                    if material_id is None:
+                        return
+                    mid = int(material_id)
+                    amt = None if amount is None else float(amount)
+                    mu = MaterialUsage()
+                    mu.service_log_id = item.id
+                    mu.material_id = mid
+                    mu.amount = amt
+                    db.session.add(mu)
+                except Exception:
+                    pass
+            if isinstance(materials_used_payload, list):
+                for it in materials_used_payload:
+                    add_usage(it.get('material_id'), it.get('amount'))
+            pb_mat = _get(poison, 'used_material_id', 'benyttet_giftaate_id', 'benyttet_giftåte_id')
+            pb_amt = _get(poison, 'refilled_grams', 'giftaate_etterfylt', 'giftåte_etterfylt')
+            if pb_mat is not None or pb_amt is not None:
+                add_usage(pb_mat, pb_amt)
+            npb_mat = _get(nonpoison, 'used_material_id', 'benyttet_giftfritt_aate_id', 'benyttet_giftfritt_åte_id')
+            npb_amt = _get(nonpoison, 'refilled_grams', 'giftfritt_etterfylt')
+            if npb_mat is not None or npb_amt is not None:
+                add_usage(npb_mat, npb_amt)
         db.session.commit()
         return jsonify(item.to_dict())
     db.session.delete(item)

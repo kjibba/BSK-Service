@@ -1,10 +1,14 @@
-import { useEffect, useState, useCallback } from 'react'
-import { VisitsAPI } from '../api'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { VisitsAPI, EquipmentTypesAPI, MaterialsAPI, ServiceLogsAPI } from '../api'
 import Button from './ui/Button'
 import Card from './ui/Card'
 import { Loading, Empty } from './ui/States'
 import { useToast } from './ui/Toast.jsx'
 import { RequireAuth } from './auth'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+import 'leaflet.gridlayer.googlemutant'
+import FeedbackButton from './FeedbackButton'
 
 export default function VisitDetail({ visitId }){
   return (
@@ -21,9 +25,70 @@ function Inner({ visitId }){
   const [logForm, setLogForm] = useState({ equipment_id: '', description: '', hours_worked: '' })
   const [summary, setSummary] = useState('')
   const [checklist, setChecklist] = useState({ sjekk_advarselskilt: false, sjekk_agnstasjoner: false, sjekk_inngangspunkter: false, sjekk_fellefangst: false })
+  const [types, setTypes] = useState([])
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [selectedEq, setSelectedEq] = useState(null)
+  const [dynamicValues, setDynamicValues] = useState({})
+  const [materials, setMaterials] = useState({ poison: [], nonpoison: [] })
+  const [editingLog, setEditingLog] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const extractNote = useCallback((text) => {
+    try {
+      if (!text) return ''
+      const s = String(text)
+      const idx = s.lastIndexOf('Notat:')
+      if (idx === -1) return ''
+      return s.slice(idx + 'Notat:'.length).trim().replace(/^[:\s-]+/, '')
+    } catch (_) { return '' }
+  }, [])
+
+  const prepareDynamicDefaults = useCallback((eq) => {
+    const vals = {}
+    try {
+      const props = (eq && eq.properties) || {}
+      if (props && props.standard_giftaate_id) {
+        vals.benyttet_giftaate_id = String(props.standard_giftaate_id)
+        const m = (materials.poison||[]).find(x => Number(x.id) === Number(props.standard_giftaate_id))
+        if (m && m.standard_amount != null) vals.giftaate_etterfylt = m.standard_amount
+      }
+      if (props && props.standard_giftfritt_aate_id) {
+        vals.benyttet_giftfritt_aate_id = String(props.standard_giftfritt_aate_id)
+        const m2 = (materials.nonpoison||[]).find(x => Number(x.id) === Number(props.standard_giftfritt_aate_id))
+        if (m2 && m2.standard_amount != null) vals.giftfritt_etterfylt = m2.standard_amount
+      }
+    } catch (_) {}
+    return vals
+  }, [materials])
+
+  // map refs
+  const mapEl = useRef(null)
+  const mapRef = useRef(null)
+  const markersRef = useRef(null)
+  const layerCtrlRef = useRef(null)
+  const activeBaseRef = useRef('osm')
+  const [baseReady, setBaseReady] = useState(false)
+
+  // Show labels for equipment at high zoom levels (mobile-friendly)
+  const updateMarkerLabels = useCallback(() => {
+    const map = mapRef.current
+    const group = markersRef.current
+    if (!map || !group) return
+    const show = (map.getZoom() || 0) >= 17
+    try {
+      group.eachLayer(layer => {
+        try {
+          // Only toggle tooltips for equipment markers
+          if (layer && layer._isEq && typeof layer.openTooltip === 'function' && typeof layer.closeTooltip === 'function') {
+            if (show) layer.openTooltip(); else layer.closeTooltip()
+          }
+        } catch (_) {}
+      })
+    } catch (_) {}
+  }, [])
+
+  const load = useCallback(async (opts) => {
+    const silent = !!(opts && opts.silent)
+    if (!silent) setLoading(true)
     try{
       const d = await VisitsAPI.detail(visitId)
       setData(d)
@@ -34,11 +99,196 @@ function Inner({ visitId }){
         sjekk_inngangspunkter: !!d?.visit?.sjekk_inngangspunkter,
         sjekk_fellefangst: !!d?.visit?.sjekk_fellefangst,
       })
+      // Load types once (for dynamic service form)
+      if (!types.length) {
+        try { setTypes(await EquipmentTypesAPI.list()) } catch (e) { /* ignore */ }
+      }
     } finally{
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [visitId])
   useEffect(()=>{ load() }, [load])
+
+  // Preload bait materials for Åtekasse service modal
+  useEffect(() => {
+    let canceled = false
+    const run = async () => {
+      try {
+        const [poison, nonpoison] = await Promise.all([
+          MaterialsAPI.list('Giftåte'),
+          MaterialsAPI.list('Giftfritt Åte'),
+        ])
+        if (!canceled) setMaterials({ poison, nonpoison })
+      } catch (_) { /* ignore */ }
+    }
+    run()
+    return () => { canceled = true }
+  }, [])
+
+  // Initialize map reliably (retry until container exists, mirror CustomerDetail behavior)
+  useEffect(() => {
+    let cancelled = false
+    const tryInit = () => {
+      if (cancelled) return
+      if (mapRef.current) return
+      if (!mapEl.current) { setTimeout(tryInit, 120); return }
+      try {
+        const map = L.map(mapEl.current, { center: [60.39299, 5.32415], zoom: 13 })
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' })
+        osm.addTo(map)
+        layerCtrlRef.current = { osm }
+        activeBaseRef.current = 'osm'
+        markersRef.current = L.layerGroup().addTo(map)
+        mapRef.current = map
+  setBaseReady(true)
+  try { map.on('zoomend', () => { try { updateMarkerLabels() } catch (e) {} }) } catch (e) {}
+        setTimeout(() => { try { map.invalidateSize(true) } catch (e) {} }, 50)
+
+        // Optional Google layers if key present
+        const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        const tryAddGoogle = () => {
+          try {
+            if (key && typeof window !== 'undefined' && window.google && L.gridLayer && L.gridLayer.googleMutant) {
+              const gRoad = L.gridLayer.googleMutant({ type: 'roadmap' })
+              const gSat = L.gridLayer.googleMutant({ type: 'satellite' })
+              layerCtrlRef.current.gRoad = gRoad
+              layerCtrlRef.current.gSat = gSat
+              // switch to satellite by default
+              try { map.removeLayer(osm) } catch (e) {}
+              gSat.addTo(map); activeBaseRef.current = 'google_sat'
+              setTimeout(() => { try { map.invalidateSize(true) } catch (e) {} }, 50)
+            }
+          } catch (e) {}
+        }
+        if (key) {
+          const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
+          if (!existing) {
+            const s = document.createElement('script')
+            s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`
+            s.async = true; s.defer = true
+            s.onload = () => { tryAddGoogle() }
+            s.onerror = () => {}
+            document.head.appendChild(s)
+          } else {
+            setTimeout(() => { tryAddGoogle() }, 60)
+          }
+        }
+      } catch (e) {
+        setTimeout(tryInit, 200)
+      }
+    }
+    tryInit()
+    return () => { cancelled = true; try { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null } } catch (e) {} }
+  }, [])
+
+  // Build color-coded icons: outer ring by equipment type, inner dot by status (red/green)
+  const iconFor = useMemo(() => {
+    const typeColors = {
+      'Åtekasse': '#0ea5e9',
+      'Gassfelle': '#a855f7',
+      'Kamera': '#f97316',
+      'Limfelle': '#06b6d4',
+    }
+    return (eqTypeName, isChecked) => {
+      const ring = typeColors[eqTypeName] || '#64748b'
+      const fill = isChecked ? '#16a34a' : '#dc2626'
+      return L.divIcon({
+        className: 'visit-eq-marker',
+        html: `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${fill};border:2px solid ${ring};box-shadow:0 0 0 2px rgba(255,255,255,0.85);"></span>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      })
+    }
+  }, [])
+
+  // Update markers when data changes
+  useEffect(() => {
+    if (!data || !data.customer || !Array.isArray(data.equipment)) return
+    const map = mapRef.current
+    const group = markersRef.current
+    if (!map || !group) return
+    group.clearLayers()
+
+    const toNum = (v) => { if (v == null) return null; const s = String(v).replace(',', '.').trim(); const n = Number(s); return Number.isFinite(n) ? n : null }
+    const toFit = []
+    let eqCount = 0
+    // Always show customer marker when coords exist (with address)
+    const cLat = toNum(data.customer.latitude)
+    const cLng = toNum(data.customer.longitude)
+    if (cLat != null && cLng != null) {
+      const addr = [data.customer.address, [data.customer.postal_code, data.customer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+      const cm = L.circleMarker([cLat, cLng], { radius: 7, color: '#0f172a', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 })
+      cm.bindPopup(`<div><strong>${data.customer.name || 'Kunde'}</strong>${addr ? `<div style=\"font-size:12px;color:#475569\">${addr}</div>`:''}<div style=\"margin-top:6px\"><a href=\"#customer:${data.customer.id}\">Åpne kundekort</a></div></div>`)
+      cm.addTo(group)
+      toFit.push([cLat, cLng])
+    }
+    data.equipment.forEach(e => {
+      const lat = toNum(e.latitude)
+      const lng = toNum(e.longitude)
+      if (lat == null || lng == null) return
+      const typeName = e.type || e.equipment_type_name || (e.equipment_type && e.equipment_type.name) || ''
+      const icon = iconFor(typeName, !!e.checked)
+  const m = L.marker([lat, lng], { icon })
+  // mark as equipment marker for label toggling
+  m._isEq = true
+  const hasExisting = (data?.logs || []).some(l => l.equipment_id === e.id)
+  const btnText = hasExisting ? 'Endre service' : 'Registrer service'
+  const html = `<div style=\"min-width:200px\"><div style=\"font-weight:600\">${e.name || 'Utstyr'}</div><div style=\"font-size:12px;color:#475569;margin:2px 0\">${typeName}</div><div style=\"margin-top:6px;display:flex;gap:6px;justify-content:flex-end\"><a href=\"#\" class=\"btn-open-service\" style=\"padding:6px 10px;font-size:12px\">${btnText}</a></div></div>`
+      m.bindPopup(html)
+      try {
+        const isChecked = !!e.checked
+        const statusEmoji = isChecked ? '✅' : '⛔'
+        const tooltipText = `${statusEmoji} ${e.name || 'Utstyr'}${typeName ? ` (${typeName})` : ''}`
+        m.bindTooltip(tooltipText, { direction: 'top', offset: [0, -8], opacity: 0.95, sticky: true, permanent: false })
+      } catch (_) {}
+      m.on('popupopen', (ev) => {
+        try {
+          const root = ev.popup.getElement()
+          const btn = root && root.querySelector && root.querySelector('.btn-open-service')
+          if (btn) {
+            btn.addEventListener('click', (evt) => {
+              evt.preventDefault(); evt.stopPropagation();
+              setSelectedEq(e);
+              setDynamicValues(prepareDynamicDefaults(e));
+              try {
+                const existing = (data?.logs || []).find(l => l.equipment_id === e.id)
+                setEditingLog(existing || null)
+                if (existing) {
+                  setLogForm(f => ({ ...f, equipment_id: e.id, description: extractNote(existing.description || ''), hours_worked: existing.hours_worked ?? '' }))
+                  const mus = existing.materials_used || []
+                  const findFirst = (arr, type) => (arr||[]).find(u => (u.material && u.material.material_type) === type)
+                  const pb = findFirst(mus, 'Giftåte')
+                  const npb = findFirst(mus, 'Giftfritt Åte')
+                  setDynamicValues(v => ({
+                    ...v,
+                    benyttet_giftaate_id: pb?.material?.id ? String(pb.material.id) : v.benyttet_giftaate_id,
+                    giftaate_etterfylt: (pb && pb.amount != null) ? pb.amount : v.giftaate_etterfylt,
+                    benyttet_giftfritt_aate_id: npb?.material?.id ? String(npb.material.id) : v.benyttet_giftfritt_aate_id,
+                    giftfritt_etterfylt: (npb && npb.amount != null) ? npb.amount : v.giftfritt_etterfylt,
+                  }))
+                } else {
+                  setLogForm(f => ({ ...f, equipment_id: e.id, description: '', hours_worked: '' }))
+                }
+              } catch (_) { setEditingLog(null) }
+              setShowLogModal(true)
+              try { ev.popup._close() } catch (_) {}
+            }, { once: true })
+          }
+        } catch (_) {}
+      })
+  m.addTo(group)
+      toFit.push([lat, lng])
+      eqCount += 1
+    })
+  // If no equipment markers, the customer marker above is already shown
+    try {
+      if (toFit.length === 1) map.setView(toFit[0], 16)
+      else if (toFit.length > 1) map.fitBounds(L.latLngBounds(toFit), { padding: [16, 16] })
+    } catch (e) {}
+    try { map.invalidateSize(true) } catch (e) {}
+    // Ensure labels reflect current zoom after markers render
+    try { updateMarkerLabels() } catch (e) {}
+  }, [data, iconFor, visitId, baseReady, updateMarkerLabels])
 
   if (loading) return <Loading>Laster besøk…</Loading>
   if (!data) return <div>Ikke funnet.</div>
@@ -49,66 +299,117 @@ function Inner({ visitId }){
 
   const addLog = async (e) => {
     e.preventDefault()
-    const payload = {
-      equipment_id: Number(logForm.equipment_id),
-      description: logForm.description,
+    const parts = []
+    if (selectedEq && selectedEq.type) parts.push(`[${selectedEq.type}]`)
+    Object.entries(dynamicValues || {}).forEach(([k, val]) => { parts.push(`${k}: ${val === true ? 'ja' : val === false ? 'nei' : (val ?? '')}`) })
+    if (logForm.description) parts.push(`Notat: ${logForm.description}`)
+    const t = (types || []).find(x => x.id === (selectedEq && selectedEq.equipment_type_id))
+    const typeName = (selectedEq && selectedEq.type) || (t && t.name) || ''
+    let payload = {
+      equipment_id: Number(logForm.equipment_id || (selectedEq && selectedEq.id)),
+      description: parts.join(' | '),
       hours_worked: logForm.hours_worked ? Number(logForm.hours_worked) : undefined,
     }
-  await VisitsAPI.logs.create(visitId, payload)
+    if (/åtekasse/i.test(typeName)) {
+      const poisonId = dynamicValues.benyttet_giftaate_id || dynamicValues.used_material_id_poison
+      const nonId = dynamicValues.benyttet_giftfritt_aate_id || dynamicValues.used_material_id_nonpoison
+      const poisonAmt = dynamicValues.giftaate_etterfylt || dynamicValues.refilled_grams_poison
+      const nonAmt = dynamicValues.giftfritt_etterfylt || dynamicValues.refilled_grams_nonpoison
+      const findName = (arr, id) => { const x = (arr||[]).find(m => Number(m.id) === Number(id)); return x ? x.name : null }
+      if (poisonId || poisonAmt) {
+        payload.poison_bait = { used_material_id: poisonId ? Number(poisonId) : undefined, refilled_grams: (poisonAmt === '' || poisonAmt == null) ? undefined : Number(poisonAmt) }
+        const nm = findName(materials.poison, poisonId)
+        parts.push(`Giftåte: ${nm || poisonId || ''} ${poisonAmt? `(${poisonAmt}g)`:''}`)
+      }
+      if (nonId || nonAmt) {
+        payload.nonpoison_bait = { used_material_id: nonId ? Number(nonId) : undefined, refilled_grams: (nonAmt === '' || nonAmt == null) ? undefined : Number(nonAmt) }
+        const nm2 = findName(materials.nonpoison, nonId)
+        parts.push(`Giftfritt åte: ${nm2 || nonId || ''} ${nonAmt? `(${nonAmt}g)`:''}`)
+      }
+      payload.description = parts.join(' | ')
+    }
+    if (editingLog && editingLog.id) {
+      await ServiceLogsAPI.update(editingLog.id, payload)
+    } else {
+      await VisitsAPI.logs.create(visitId, payload)
+    }
     setLogForm({ equipment_id: '', description: '', hours_worked: '' })
-  toast.push({ variant: 'success', title: 'Logg lagret' })
-    await load()
+    setShowLogModal(false)
+    setEditingLog(null)
+    toast.push({ variant: 'success', title: 'Logg lagret' })
+  await load({ silent: true })
   }
 
   const start = async () => {
-  await VisitsAPI.start(visitId)
-  toast.push({ variant: 'info', title: 'Besøk startet' })
-    await load()
+    try {
+      await VisitsAPI.start(visitId)
+      toast.push({ variant: 'info', title: 'Besøk startet' })
+      await load()
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Kunne ikke starte besøk'
+      toast.push({ variant: 'error', title: 'Start feilet', description: String(msg) })
+    }
   }
 
   const complete = async () => {
-  await VisitsAPI.complete(visitId, { summary, checklist })
-  toast.push({ variant: 'success', title: 'Besøk fullført' })
-    await load()
+    const missingChecklist = Object.keys(checklist).filter(k => checklist[k] !== true)
+    if (!summary || !summary.trim()) {
+      toast.push({ variant: 'error', title: 'Mangler oppsummering', description: 'Skriv en kort oppsummering før fullføring.' })
+      return
+    }
+    const unchecked = (data?.equipment || []).filter(e => !e.checked)
+    if (unchecked.length > 0) {
+      const ok = window.confirm('Ikke alt utstyr er kontrollert. Er du sikker på at du vil fullføre?')
+      if (!ok) return
+    }
+    if (missingChecklist.length > 0) {
+      const ok2 = window.confirm('Sjekklisten er ikke komplett. Vil du fullføre likevel?')
+      if (!ok2) return
+    }
+    await VisitsAPI.complete(visitId, { summary, checklist })
+    toast.push({ variant: 'success', title: 'Besøk fullført' })
+    window.location.hash = 'missions'
+  }
+
+  const niceName = (k) => {
+    const map = {
+      sjekk_advarselskilt: 'Advarselskilt',
+      sjekk_agnstasjoner: 'Substitusjon',
+      sjekk_inngangspunkter: 'Inngangspunkter',
+      sjekk_fellefangst: 'Fellefangst',
+    }
+    return map[k] || (k || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
   return (
     <div className="stack" style={{gap:16}}>
+  <FeedbackButton context={{ page: 'visit', visitId }} />
       <Card title="Besøksdetalj">
-        <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>
-        <div>Status: {v.status || 'Planlagt'}</div>
-        {canStart && <Button variant="primary" onClick={start} style={{marginTop:8}}>Start</Button>}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8}}>
+          <div>
+            <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>
+            <div style={{fontSize:13, color:'#475569'}}>Status: {v.status || 'Planlagt'}</div>
+          </div>
+          <div style={{display:'flex', gap:8}}>
+            {canStart && <Button variant="primary" onClick={start}>Start besøk</Button>}
+            <Button onClick={() => window.history.back()}>Tilbake</Button>
+          </div>
+        </div>
       </Card>
 
-      <Card>
-        <h4>Utstyr hos kunde</h4>
-        <ul>
-          {data.equipment.map(e => (
-            <li key={e.id}>
-              <input type="checkbox" readOnly checked={!!e.checked} /> {e.name}
-            </li>
-          ))}
-        </ul>
+      <Card title="Utstyrskart">
+        <div style={{ height: 380, borderRadius: 8, overflow: 'hidden' }}>
+          <div ref={mapEl} style={{ width: '100%', height: '100%' }} />
+        </div>
+        {(!data.equipment || data.equipment.length === 0) ? (
+          <div style={{marginTop:8, fontSize:13, color:'#475569'}}>Ingen utstyr registrert hos kunden ennå. Du kan legge til utstyr fra kundekortet.</div>
+        ) : (
+          <div style={{marginTop:8, fontSize:12, color:'#475569'}}>Zoom inn for å se navn på utstyr. Klikk en markør og velg «Utfør service» for å registrere kontroll.</div>
+        )}
       </Card>
 
-      <Card>
-        <h4>Legg til logg</h4>
-        <form onSubmit={addLog} className="stack" style={{gap:8}}>
-          <select className="input" value={logForm.equipment_id} onChange={e=> setLogForm(f=>({...f, equipment_id: e.target.value}))} required>
-            <option value="">Velg utstyr</option>
-            {data.equipment.map(e => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
-          <textarea className="input" placeholder="Beskrivelse" value={logForm.description} onChange={e=> setLogForm(f=>({...f, description: e.target.value}))} required />
-          <input className="input" type="number" min="0" step="0.25" placeholder="Timer brukt (valgfritt)" value={logForm.hours_worked} onChange={e=> setLogForm(f=>({...f, hours_worked: e.target.value}))} />
-          <Button type="submit">Lagre logg</Button>
-        </form>
-      </Card>
-
-      <Card>
-        <h4>Oppsummering og sjekkliste</h4>
-        <textarea className="input" placeholder="Oppsummering" value={summary} onChange={e=> setSummary(e.target.value)} />
+      <Card title="Oppsummering og sjekkliste">
+        <textarea className="input" placeholder="Oppsummering til kunde" value={summary} onChange={e=> setSummary(e.target.value)} />
         <div className="list" style={{marginTop:8}}>
           {Object.keys(checklist).map(k => (
             <label key={k} className="list-item" style={{gap:8}}>
@@ -120,8 +421,55 @@ function Inner({ visitId }){
         {canComplete && <Button variant="success" onClick={complete} style={{marginTop:8}}>Fullfør besøk</Button>}
       </Card>
 
-      <Card>
-        <h4>Logger</h4>
+      <Card title="Utstyrsliste">
+        {!data.equipment?.length ? (
+          <Empty>Ingen utstyr registrert.</Empty>
+        ) : (
+          <ul className="list">
+            {data.equipment.map(eq => {
+              const hasExisting = (data?.logs || []).some(l => l.equipment_id === eq.id)
+              const btnLabel = hasExisting ? 'Endre service' : 'Utfør service'
+              return (
+                <li key={eq.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{eq.name || 'Utstyr'}</div>
+                    <div style={{ fontSize: 12, color:'#475569' }}>{eq.type || ''}</div>
+                  </div>
+                  <div>
+                    <Button size="sm" onClick={() => {
+                      setSelectedEq(eq);
+                      setDynamicValues(prepareDynamicDefaults(eq));
+                      try {
+                        const existing = (data?.logs || []).find(l => l.equipment_id === eq.id)
+                        setEditingLog(existing || null)
+                        if (existing) {
+                          setLogForm(f => ({ ...f, equipment_id: eq.id, description: extractNote(existing.description || ''), hours_worked: existing.hours_worked ?? '' }))
+                          const mus = existing.materials_used || []
+                          const findFirst = (arr, type) => (arr||[]).find(u => (u.material && u.material.material_type) === type)
+                          const pb = findFirst(mus, 'Giftåte')
+                          const npb = findFirst(mus, 'Giftfritt Åte')
+                          setDynamicValues(v => ({
+                            ...v,
+                            benyttet_giftaate_id: pb?.material?.id ? String(pb.material.id) : v.benyttet_giftaate_id,
+                            giftaate_etterfylt: (pb && pb.amount != null) ? pb.amount : v.giftaate_etterfylt,
+                            benyttet_giftfritt_aate_id: npb?.material?.id ? String(npb.material.id) : v.benyttet_giftfritt_aate_id,
+                            giftfritt_etterfylt: (npb && npb.amount != null) ? npb.amount : v.giftfritt_etterfylt,
+                          }))
+                        } else {
+                          setLogForm(f => ({ ...f, equipment_id: eq.id, description: '', hours_worked: '' }))
+                        }
+                      } catch (_) { setEditingLog(null) }
+                      setShowLogModal(true)
+                    }}>{btnLabel}</Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
+
+      <Card title="Logger">
         {!data.logs?.length ? <Empty>Ingen logger ennå.</Empty> : (
           <ul>
             {data.logs.map(l => (
@@ -130,16 +478,92 @@ function Inner({ visitId }){
           </ul>
         )}
       </Card>
+
+      {showLogModal && selectedEq && (
+        <div className="modal-backdrop" style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000}}>
+          <div className="modal" style={{background:'#fff',borderRadius:8,padding:16,minWidth:320,maxWidth:560,width:'96%', zIndex:3100}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <div style={{fontWeight:600}}>Registrer service: {selectedEq.name}</div>
+              <button type="button" className="btn" onClick={()=> { setShowLogModal(false); setEditingLog(null) }}>Lukk</button>
+            </div>
+            <form className="stack" style={{gap:8}} onSubmit={addLog}>
+              {(() => {
+                const t = (types || []).find(x => x.id === selectedEq.equipment_type_id)
+                let fields = Array.isArray(t?.fields) ? t.fields : []
+                // Fallbacks based on equipment type name when no configured fields
+                const typeName = selectedEq.type || t?.name || ''
+                if (!fields.length) {
+                  if (/åtekasse/i.test(typeName)) {
+                    fields = [
+                      { key: 'forbruk_giftaate', label: 'Forbruk giftåte (%)', type: 'select', options: ['0%','25%','50%','75%','100%'] },
+                      { key: 'benyttet_giftaate_id', label: 'Benyttet giftåte', type: 'select', options: (materials.poison||[]).map(m => ({ value: m.id, label: m.name })) },
+                      { key: 'giftaate_etterfylt', label: 'Giftåte etterfylt (gram)', type: 'number' },
+                      { key: 'benyttet_giftfritt_aate_id', label: 'Benyttet giftfritt åte', type: 'select', options: (materials.nonpoison||[]).map(m => ({ value: m.id, label: m.name })) },
+                      { key: 'giftfritt_etterfylt', label: 'Giftfritt åte etterfylt (gram)', type: 'number' },
+                    ]
+                  } else if (/gassfelle/i.test(typeName)) {
+                    fields = [ { key: 'antall_slag', label: 'Antall slag', type: 'number' } ]
+                  } else if (/limfelle/i.test(typeName)) {
+                    fields = [ { key: 'antall_fangst', label: 'Antall fangst', type: 'number' } ]
+                  }
+                }
+                if (!fields.length) return null
+                return (
+                  <div className="stack" style={{gap:8}}>
+                    <div style={{fontSize:12, color:'#475569'}}>{typeName ? `Type: ${typeName}` : ''}</div>
+                    {fields.map((f, idx) => {
+                      const key = (f.key || '').trim()
+                      const label = f.label || key || 'Felt'
+                      const type = (f.type || 'text')
+                      if (!key) return null
+                      if (type === 'boolean') {
+                        return (
+                          <label key={idx} style={{display:'flex',alignItems:'center',gap:8}}>
+                            <input type="checkbox" checked={!!dynamicValues[key]} onChange={e=> setDynamicValues(v=> ({...v, [key]: e.target.checked}))} />
+                            <span>{label}</span>
+                          </label>
+                        )
+                      }
+                      if (type === 'select') {
+                        const opts = Array.isArray(f.options) ? f.options : []
+                        return (
+                          <label key={idx} className="stack" style={{gap:4}}>
+                            <div>{label}</div>
+                            <select className="input" value={dynamicValues[key] ?? ''} onChange={e=> setDynamicValues(v=> ({...v, [key]: e.target.value}))}>
+                              <option value="">Velg…</option>
+                              {opts.map((o,i) => {
+                                if (o && typeof o === 'object' && 'value' in o) return <option key={i} value={String(o.value)}>{String(o.label ?? o.value)}</option>
+                                return <option key={i} value={String(o)}>{String(o)}</option>
+                              })}
+                            </select>
+                          </label>
+                        )
+                      }
+                      const isNum = (type === 'number')
+                      return (
+                        <label key={idx} className="stack" style={{gap:4}}>
+                          <div>{label}</div>
+                          <input className="input" type={isNum? 'number':'text'} step={isNum? 'any': undefined} value={dynamicValues[key] ?? ''} onChange={e=> setDynamicValues(v=> ({...v, [key]: isNum ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value}))} />
+                        </label>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              <textarea className="input" placeholder="Notat (valgfritt)" value={logForm.description} onChange={e=> setLogForm(f=>({...f, description: e.target.value}))} />
+              <input className="input" type="number" min="0" step="0.25" placeholder="Timer (valgfritt)" value={logForm.hours_worked} onChange={e=> setLogForm(f=>({...f, hours_worked: e.target.value}))} />
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                <div style={{fontSize:12,color:'#64748b'}}>{editingLog ? 'Redigerer tidligere logg for dette utstyret' : ''}</div>
+                <div style={{display:'flex',gap:8}}>
+                  <Button type="button" onClick={()=> { setShowLogModal(false); setEditingLog(null) }}>Avbryt</Button>
+                  <Button variant="primary" type="submit">{editingLog ? 'Oppdater' : 'Lagre'}</Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
-
-function niceName(key){
-  const map = {
-    sjekk_advarselskilt: 'Advarselskilt',
-    sjekk_agnstasjoner: 'Agnstasjoner',
-    sjekk_inngangspunkter: 'Inngangspunkter',
-    sjekk_fellefangst: 'Fellefangst',
-  }
-  return map[key] || key
 }

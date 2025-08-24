@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapAPI } from '../api';
+import { MapAPI, VisitsAPI, EmployeesAPI } from '../api';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet.gridlayer.googlemutant';
@@ -130,8 +130,57 @@ export default function MapView() {
       const icon = status === 'green' ? greenIcon : status === 'yellow' ? yellowIcon : redIcon;
       const m = L.marker([c.latitude, c.longitude], { icon });
       const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
-  const html = `<div style="min-width:200px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px">Neste service: ${nextText}</div><div style="margin-top:6px"><a href="#customer:${c.id}">Åpne kundekort</a></div></div>`;
+        const html = `<div style="min-width:240px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px">Neste service: ${nextText}</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="btn-open" href="#customer:${c.id}">Åpne kundekort</a><button type="button" class="btn-new-visit" data-id="${c.id}" style="padding:4px 8px;font-size:12px">+ Nytt oppdrag</button></div><div class="new-visit-form" style="display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px"><label style="display:block;margin-bottom:6px;font-size:12px">Dato og tid<input type="datetime-local" class="nv-date" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><label style="display:block;margin-bottom:6px;font-size:12px">Tekniker<select class="nv-tech" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">(ingen)</option></select></label><label style="display:block;margin-bottom:6px;font-size:12px">Notat<input class="nv-notes" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="nv-cancel" style="padding:4px 8px;font-size:12px">Avbryt</button><button type="button" class="nv-save" style="padding:4px 8px;font-size:12px">Opprett</button></div></div></div>`;
       m.bindPopup(html);
+        m.on('popupopen', async (ev) => {
+          const root = ev.popup.getElement();
+          const btn = root.querySelector('.btn-new-visit');
+          const formBox = root.querySelector('.new-visit-form');
+          const techSel = root.querySelector('.nv-tech');
+          const cancelBtn = root.querySelector('.nv-cancel');
+          const saveBtn = root.querySelector('.nv-save');
+          const dateInput = root.querySelector('.nv-date');
+          const notesInput = root.querySelector('.nv-notes');
+          if (btn && formBox) {
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault(); e.stopPropagation();
+              try { formBox.style.display = 'block'; } catch {}
+              // load employees once
+              if (techSel && techSel.options && techSel.options.length <= 1) {
+                try {
+                  const emps = await EmployeesAPI.list();
+                  techSel.innerHTML = '<option value="">(ingen)</option>' + (emps || []).map(emp => `<option value="${emp.id}">${emp.name || emp.email}</option>`).join('');
+                } catch {}
+              }
+              try {
+                const now = new Date();
+                const iso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+                dateInput.value = iso;
+              } catch {}
+            }, { once: true });
+          }
+          if (cancelBtn && formBox) {
+            cancelBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); try { formBox.style.display = 'none'; } catch {} }, { once: true });
+          }
+          if (saveBtn) {
+            saveBtn.addEventListener('click', async (e2) => {
+              e2.preventDefault(); e2.stopPropagation();
+              try {
+                const visit_date = dateInput && dateInput.value ? new Date(dateInput.value).toISOString() : null;
+                if (!visit_date) { alert('Velg dato og tid.'); return; }
+                const payload = { customer_id: c.id, visit_date, notes: (notesInput?.value || '').trim() || undefined };
+                if (techSel && techSel.value) payload.assigned_technician_id = Number(techSel.value);
+                const created = await VisitsAPI.office.create(payload);
+                // navigate directly to the visit or just inform
+                if (created && created.id) {
+                  window.location.hash = `visit:${created.id}`;
+                }
+              } catch (err) {
+                alert('Kunne ikke opprette oppdrag.');
+              }
+            }, { once: true });
+          }
+        });
       m.addTo(group);
     });
 

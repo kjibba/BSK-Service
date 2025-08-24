@@ -28,8 +28,23 @@ def list_create_visit():
         item = Visit()
         item.customer_id = data['customer_id']
         item.visit_date = _parse_dt(data['visit_date'])
+        # Optional fields
         item.technician = data.get('technician')
         item.notes = data.get('notes')
+        # Allow assigning directly on create if field exists
+        try:
+            if hasattr(item, 'assigned_technician_id'):
+                _assignee = data.get('assigned_technician_id')
+                if _assignee is not None:
+                    item.assigned_technician_id = int(_assignee)
+        except Exception:
+            pass
+        # Allow setting status explicitly if provided; otherwise model default applies
+        try:
+            if hasattr(item, 'status') and data.get('status'):
+                item.status = str(data.get('status'))
+        except Exception:
+            pass
         db.session.add(item)
         db.session.commit()
         return jsonify(item.to_dict()), 201

@@ -61,7 +61,14 @@ function Inner(){
         <div key={v.id} className="list-item">
           <div>
             <div><strong>Besøk #{v.id}</strong> — {new Date(v.visit_date).toLocaleString()}</div>
-            {v.customer_id ? <div>Kunde #{v.customer_id}</div> : null}
+            {v.customer_name ? (
+              <div>
+                <span style={{fontWeight:600}}>{v.customer_name}</span>
+                {v.customer_address ? (
+                  <span> — {v.customer_address}{v.customer_postal_code || v.customer_city ? `, ${[v.customer_postal_code, v.customer_city].filter(Boolean).join(' ')}` : ''}</span>
+                ) : null}
+              </div>
+            ) : (v.customer_id ? <div>Kunde #{v.customer_id}</div> : null)}
             <div>Status: {v.status || 'Planlagt'}</div>
             {isManager && (
               <AssignRow visit={v} emps={emps} onAssign={async (vid, tid)=>{ await VisitsAPI.assign(vid, tid); await load() }} />

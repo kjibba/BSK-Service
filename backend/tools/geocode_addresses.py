@@ -1,6 +1,7 @@
 import os
 import time
 from urllib.parse import urlencode
+import re
 import requests
 from flask import Flask
 
@@ -16,9 +17,44 @@ def create_app():
     return app
 
 
+def _norm_postcode(pc: str | None) -> str | None:
+    if not pc:
+        return None
+    s = str(pc).strip()
+    # keep only 4 consecutive digits if present
+    m = re.search(r"\b(\d{4})\b", s)
+    return m.group(1) if m else None
+
+
 def build_query(customer: Customer) -> str:
-    parts = [p for p in [customer.address, customer.postal_code, customer.city] if p]
-    return ", ".join(parts)
+    """Build a clean query string:
+    - Extract a 4-digit postal code (if any) and avoid duplicates with address
+    - Include city when present
+    - Append country to constrain search
+    """
+    address = (customer.address or '').strip()
+    city = (customer.city or '').strip()
+    pc = _norm_postcode(getattr(customer, 'postal_code', None))
+    # If address already contains the same postcode, don't add it again
+    addr_has_pc = bool(pc and re.search(rf"\b{re.escape(pc)}\b", address))
+    parts: list[str] = []
+    if address:
+        parts.append(address)
+    if pc and not addr_has_pc:
+        parts.append(pc)
+    if city:
+        parts.append(city)
+    parts.append('Norge')
+    # Deduplicate while preserving order (case-insensitive)
+    seen = set()
+    uniq: list[str] = []
+    for p in parts:
+        key = p.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(p)
+    return ", ".join(uniq)
 
 
 def geocode(query: str, user_agent: str) -> tuple[float | None, float | None]:
@@ -28,6 +64,7 @@ def geocode(query: str, user_agent: str) -> tuple[float | None, float | None]:
         'format': 'json',
         'addressdetails': 0,
         'limit': 1,
+    'countrycodes': 'no',
     }
     headers = { 'User-Agent': user_agent }
     r = requests.get(base, params=params, headers=headers, timeout=15)
@@ -51,28 +88,62 @@ def main():
 
     app = create_app()
     with app.app_context():
-        # Find customers missing coordinates
-        missing = Customer.query.filter((Customer.latitude.is_(None)) | (Customer.longitude.is_(None))).limit(batch).all()
-        print(f"Customers missing coords: {len(missing)} (processing up to {batch})")
-        updated = 0
-        for c in missing:
-            q = build_query(c)
-            if not q:
-                continue
-            lat, lon = geocode(q, user_agent)
-            if lat is not None and lon is not None:
-                c.latitude = lat
-                c.longitude = lon
-                updated += 1
-                print(f"✓ {c.id} {c.name}: {lat}, {lon}")
-                # Commit in small chunks to avoid large transactions
-                if updated % 10 == 0:
-                    db.session.commit()
-            else:
-                print(f"- No match for {c.id} {c.name} [{q}]")
-            time.sleep(delay)
-        db.session.commit()
-        print(f"Done. Updated {updated} customers with coordinates.")
+        total_updated = 0
+        while True:
+            missing = (
+                Customer.query
+                .filter((Customer.latitude.is_(None)) | (Customer.longitude.is_(None)))
+                .limit(batch)
+                .all()
+            )
+            if not missing:
+                break
+            print(f"Customers missing coords: {len(missing)} (processing up to {batch})")
+            updated = 0
+            for c in missing:
+                base_q = build_query(c)
+                if not base_q:
+                    continue
+                lat, lon = geocode(base_q, user_agent)
+                # Fallback variants if first try fails
+                if lat is None or lon is None:
+                    address = (c.address or '').strip()
+                    city = (c.city or '').strip()
+                    pc = _norm_postcode(getattr(c, 'postal_code', None))
+                    candidates = []
+                    if address and city:
+                        candidates.append(f"{address}, {city}, Norge")
+                    if address and pc:
+                        candidates.append(f"{address}, {pc}, Norge")
+                    if city and pc:
+                        candidates.append(f"{pc} {city}, Norge")
+                    # Unique candidate strings
+                    seen = set()
+                    uniq_cands = []
+                    for s in candidates:
+                        k = s.lower()
+                        if k not in seen:
+                            seen.add(k)
+                            uniq_cands.append(s)
+                    for q2 in uniq_cands:
+                        lat, lon = geocode(q2, user_agent)
+                        if lat is not None and lon is not None:
+                            break
+                if lat is not None and lon is not None:
+                    c.latitude = lat
+                    c.longitude = lon
+                    updated += 1
+                    total_updated += 1
+                    print(f"✓ {c.id} {c.name}: {lat}, {lon}")
+                    if updated % 10 == 0:
+                        db.session.commit()
+                else:
+                    print(f"- No match for {c.id} {c.name} [{base_q}]")
+                time.sleep(delay)
+            db.session.commit()
+            print(f"Batch updated: {updated}")
+            # If fewer than batch were returned, we reached the end; loop continues and will break next round
+        print(f"Done. Updated total {total_updated} customers with coordinates.")
 
 
 if __name__ == '__main__':

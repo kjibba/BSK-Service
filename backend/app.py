@@ -5,9 +5,12 @@ from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user as flask_login_user
 
 from backend.extensions import db
-from backend.models import Customer, Visit, Equipment, ServiceLog, Employee
+from backend.models import Customer, Visit, Equipment, ServiceLog, Employee, Material, MaterialUsage, Feedback
 from sqlalchemy import or_
 from datetime import datetime, timedelta
+import os
+import json
+import platform
 # Dynamically import current_user to avoid hard dependency on flask_login in environments without it.
 try:  # pragma: no cover - optional dependency
     from importlib import import_module
@@ -88,12 +91,8 @@ def auth_login():
         return jsonify({'error': 'email required'}), 400
     emp = Employee.query.filter(Employee.email == email).first()
     if not emp:
-        # Auto-provision a simple employee on first login
-        emp = Employee()
-        emp.name = email.split('@')[0]
-        emp.email = email
-        db.session.add(emp)
-        db.session.commit()
+        # Reject unknown emails; do not auto-provision
+        return jsonify({'error': 'Ukjent e-post. Kontakt administrator for tilgang.'}), 401
     user = User.from_employee(emp)
     login_user(user, remember=True)
     return jsonify({'user': {'id': user.id, 'email': user.email, 'name': user.name, 'role': getattr(emp, 'role', None)}})
@@ -439,14 +438,24 @@ def my_missions() -> ResponseReturnValue:
             'error': 'Unable to determine technician identity or assignment field. Provide ?user_id= or ?email=, or ensure authentication and Visit.assigned_technician_id exist.'
         }), 400
 
-    # Only planned visits if status field exists; otherwise, assume future-dated planned visits.
+    # Include planned and ongoing visits if status field exists; otherwise, assume future-dated visits are relevant.
     if hasattr(Visit, 'status'):
-        query = query.filter(getattr(Visit, 'status') == 'Planlagt')
+        query = query.filter(getattr(Visit, 'status').in_(['Planlagt', 'Pågående']))
     else:
         # Best-effort heuristic: future visits are considered planned
         query = query.filter(Visit.visit_date >= now)
 
     visits = query.order_by(Visit.visit_date.asc()).all()
+
+    # Prefetch customers to enrich response without N+1
+    cust_ids = list({int(v.customer_id) for v in visits if getattr(v, 'customer_id', None) is not None})
+    customers = {}
+    if cust_ids:
+        for c in Customer.query.filter(Customer.id.in_(cust_ids)).all():
+            try:
+                customers[int(c.id)] = c
+            except Exception:
+                pass
 
     # Build response dicts, including optional fields if present
     items = []
@@ -456,6 +465,19 @@ def my_missions() -> ResponseReturnValue:
             obj['status'] = getattr(v, 'status')
         if hasattr(v, 'assigned_technician_id'):
             obj['assigned_technician_id'] = getattr(v, 'assigned_technician_id')
+        # Add customer details for better UX in lists
+        try:
+            c = customers.get(int(v.customer_id)) if getattr(v, 'customer_id', None) is not None else None
+        except Exception:
+            c = None
+        if c is not None:
+            try:
+                obj['customer_name'] = getattr(c, 'name', None)
+                obj['customer_address'] = getattr(c, 'address', None)
+                obj['customer_postal_code'] = getattr(c, 'postal_code', None)
+                obj['customer_city'] = getattr(c, 'city', None)
+            except Exception:
+                pass
         items.append(obj)
 
     return jsonify(items)
@@ -493,6 +515,97 @@ def _get_request_user():
     return uid, email
 
 
+@app.route('/api/feedback', methods=['POST', 'GET'])
+def feedback_list_create():
+    """POST: create feedback entry (open)
+       GET: list recent feedback entries for managers
+    """
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        uid, email = _get_request_user()
+        f = None
+        try:
+            f = Feedback()
+            f.user_id = uid
+            f.user_email = email
+            f.text = data.get('text') or data.get('message') or ''
+            f.context = data.get('context') or {}
+            f.diagnostics = data.get('diagnostics') or {}
+            f.status = 'open'
+            f.created_at = datetime.utcnow()
+            f.updated_at = datetime.utcnow()
+            db.session.add(f)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception('Failed to store feedback: %s', e)
+            return jsonify({'error': 'failed to store feedback'}), 500
+        return jsonify({'ok': True, 'id': f.id}), 201
+
+    # GET: manager-only
+    try:
+        if not (flask_login_user and getattr(flask_login_user, 'is_authenticated', False)):
+            return jsonify({'error': 'authentication required'}), 401
+    except Exception:
+        return jsonify({'error': 'authentication required'}), 401
+    try:
+        emp = Employee.query.get(int(flask_login_user.id)) if getattr(flask_login_user, 'is_authenticated', False) else None
+    except Exception:
+        emp = None
+    if not emp or getattr(emp, 'role', '') != 'manager':
+        return jsonify({'error': 'manager role required'}), 403
+
+    tail = 200
+    try:
+        if 'tail' in request.args:
+            tail = max(1, int(request.args.get('tail') or tail))
+    except Exception:
+        tail = 200
+
+    items = [f.to_dict() for f in Feedback.query.order_by(Feedback.created_at.desc()).limit(tail).all()]
+    return jsonify({'count': len(items), 'items': items})
+
+
+@app.route('/api/feedback/<int:fid>', methods=['GET', 'PUT'])
+@login_required
+def feedback_detail(fid: int):
+    """GET feedback detail (manager) or PUT to update status/handler_note (manager)
+    """
+    f = Feedback.query.get_or_404(fid)
+    # Check manager
+    emp = None
+    try:
+        emp = Employee.query.get(int(flask_login_user.id)) if getattr(flask_login_user, 'is_authenticated', False) else None
+    except Exception:
+        emp = None
+    if not emp or getattr(emp, 'role', '') != 'manager':
+        return jsonify({'error': 'manager role required'}), 403
+
+    if request.method == 'GET':
+        return jsonify(f.to_dict())
+
+    data = request.get_json() or {}
+    changed = False
+    if 'status' in data and data['status'] in ('open', 'in_progress', 'closed'):
+        f.status = data['status']; changed = True
+    if 'handler_note' in data:
+        f.handler_note = data['handler_note']; changed = True
+    if 'handled_by' in data:
+        try:
+            f.handled_by = int(data['handled_by'])
+            changed = True
+        except Exception:
+            pass
+    if changed:
+        f.updated_at = datetime.utcnow()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({'error': 'failed to update'}), 500
+    return jsonify(f.to_dict())
+
+
 def _is_assigned_to_visit(v: Visit, uid, email) -> bool:
     """Check if requester is assigned to this visit (by id or email), when fields exist.
     Falls back to False if we cannot determine.
@@ -520,6 +633,126 @@ def _is_owner_of_visit(v: Visit, uid) -> bool:
         except Exception:
             return False
     return False
+
+
+@app.route('/api/office/visits', methods=['POST'])
+@login_required
+def office_create_visit() -> ResponseReturnValue:
+    """Office: create an ad-hoc visit for a customer (e.g., phone-in job).
+
+    Body: {
+      customer_id: int,           // required
+      visit_date: ISO8601 string, // required
+      notes?: str,
+      assigned_technician_id?: int, // optional assignment
+      technician_email?: str         // fallback if id not given
+    }
+    Returns created Visit.
+    Permissions: any authenticated user; assignment to other techs is allowed for managers only.
+    """
+    data = request.get_json() or {}
+    cid = data.get('customer_id')
+    when = data.get('visit_date')
+    if not cid or not when:
+        return jsonify({'error': 'customer_id and visit_date are required'}), 400
+    try:
+        # parse datetime; accept 'Z'
+        if isinstance(when, str) and when.endswith('Z'):
+            when = when[:-1] + '+00:00'
+        dt = datetime.fromisoformat(when) if isinstance(when, str) else when
+        if hasattr(dt, 'tzinfo') and dt.tzinfo:
+            dt = dt.replace(tzinfo=None)
+    except Exception:
+        return jsonify({'error': 'visit_date must be ISO 8601 datetime'}), 400
+
+    v = Visit()
+    v.customer_id = int(cid)
+    v.visit_date = dt
+    if 'notes' in data:
+        v.notes = data.get('notes')
+
+    # assignment rules
+    target_id = data.get('assigned_technician_id')
+    tech_email = data.get('technician_email')
+    requester = None
+    try:
+        requester = Employee.query.get(int(flask_login_user.id)) if flask_login_user.is_authenticated else None
+    except Exception:
+        requester = None
+    is_manager = bool(getattr(requester, 'role', '') == 'manager')
+    if target_id is not None:
+        # allow self-assign; manager can assign anyone
+        is_self = False
+        try:
+            is_self = int(flask_login_user.id) == int(target_id)
+        except Exception:
+            is_self = False
+        if is_manager or is_self:
+            if hasattr(v, 'assigned_technician_id'):
+                try: v.assigned_technician_id = int(target_id)
+                except Exception: pass
+            else:
+                # fallback to email
+                tech = Employee.query.get(int(target_id))
+                if tech and tech.email:
+                    v.technician = tech.email
+        else:
+            return jsonify({'error': 'Not allowed to assign to other technicians'}), 403
+    elif tech_email:
+        # email assignment only if manager
+        if is_manager:
+            v.technician = str(tech_email)
+        else:
+            return jsonify({'error': 'Only managers can assign by email'}), 403
+
+    # If no assignment was provided, default to self-assign for convenience
+    if target_id is None and not tech_email:
+        try:
+            if hasattr(v, 'assigned_technician_id') and flask_login_user.is_authenticated and getattr(flask_login_user, 'id', None) is not None:
+                v.assigned_technician_id = int(flask_login_user.id)
+            elif getattr(flask_login_user, 'email', None) and not getattr(v, 'assigned_technician_id', None):
+                # Fallback to string email if assignment id field is not present
+                v.technician = str(getattr(flask_login_user, 'email'))
+        except Exception:
+            pass
+
+    # Ensure default status Planlagt if field exists
+    try:
+        if hasattr(v, 'status') and not v.status:
+            v.status = 'Planlagt'
+    except Exception:
+        pass
+    db.session.add(v)
+    db.session.commit()
+    return jsonify(v.to_dict()), 201
+
+
+@app.route('/api/office/visits/<int:visit_id>/assign', methods=['POST'])
+@login_required
+def office_assign_visit(visit_id: int) -> ResponseReturnValue:
+    """Office: assign an existing visit to a technician (manager only)."""
+    v = Visit.query.get_or_404(visit_id)
+    data = request.get_json() or {}
+    target_id = data.get('assigned_technician_id')
+    if target_id is None:
+        return jsonify({'error': 'assigned_technician_id required'}), 400
+    # Only manager can assign via this office endpoint
+    emp = None
+    try:
+        emp = Employee.query.get(int(flask_login_user.id)) if flask_login_user.is_authenticated else None
+    except Exception:
+        emp = None
+    if not emp or getattr(emp, 'role', '') != 'manager':
+        return jsonify({'error': 'Only managers can assign'}), 403
+    if hasattr(v, 'assigned_technician_id'):
+        try: v.assigned_technician_id = int(target_id)
+        except Exception: pass
+    else:
+        tech = Employee.query.get(int(target_id))
+        if tech and tech.email:
+            v.technician = tech.email
+    db.session.commit()
+    return jsonify(v.to_dict())
 
 
 @app.route('/api/visits/<int:visit_id>/assign', methods=['POST'])
@@ -620,6 +853,24 @@ def start_visit(visit_id: int) -> ResponseReturnValue:
         obj['info'] = 'Visit already started'
         return jsonify(obj)
 
+    # If the visit is unassigned, auto-assign to the requester to allow starting.
+    try:
+        unassigned = True
+        if hasattr(v, 'assigned_technician_id') and getattr(v, 'assigned_technician_id') not in (None, 0):
+            unassigned = False
+        if hasattr(v, 'technician') and getattr(v, 'technician'):
+            unassigned = False
+        if unassigned and uid is not None:
+            try:
+                if hasattr(v, 'assigned_technician_id'):
+                    setattr(v, 'assigned_technician_id', int(uid))
+                elif email:
+                    setattr(v, 'technician', str(email))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     if _is_assigned_to_visit(v, uid, email) or (uid is None and email is None):
         now = datetime.now()
         notes = []
@@ -643,7 +894,11 @@ def start_visit(visit_id: int) -> ResponseReturnValue:
         if notes:
             obj['warnings'] = notes
         return jsonify(obj)
-    return jsonify({'error': 'Not allowed to start this visit'}), 403
+    # Provide more context in the error for the UI
+    who = {'uid': uid, 'email': email}
+    assigned = getattr(v, 'assigned_technician_id', None)
+    techStr = getattr(v, 'technician', None)
+    return jsonify({'error': 'Not allowed to start this visit', 'whoami': who, 'assigned_technician_id': assigned, 'technician': techStr}), 403
 
 
 @app.route('/api/visits/<int:visit_id>/logs', methods=['GET', 'POST'])
@@ -694,6 +949,7 @@ def visit_logs(visit_id: int) -> ResponseReturnValue:
     if dt is None:
         dt = datetime.now()
 
+    # Create service log
     s = ServiceLog()
     s.visit_id = visit_id
     s.equipment_id = equipment_id
@@ -701,8 +957,81 @@ def visit_logs(visit_id: int) -> ResponseReturnValue:
     s.hours_worked = hours
     s.log_date = dt
     db.session.add(s)
+
+    # Optional: bait usage details and materials
+    # Accept both English-like and Norwegian keys
+    def _get(dct, *keys):
+        for k in keys:
+            if k in dct:
+                return dct.get(k)
+        return None
+
+    materials_used_payload = data.get('materials_used')
+    # Structured bait sections
+    poison = data.get('poison_bait') or {}
+    nonpoison = data.get('nonpoison_bait') or {}
+
+    # Helper to add a material usage safely
+    def add_usage(material_id, amount):
+        try:
+            if material_id is None:
+                return
+            mid = int(material_id)
+            amt = None if amount is None else float(amount)
+            mu = MaterialUsage()
+            # Set FK directly to avoid attribute assignment issues flagged by type checkers
+            # Ensure s has an id (flush) so FK is valid
+            try:
+                db.session.flush()
+            except Exception:
+                pass
+            mu.service_log_id = s.id
+            mu.material_id = mid
+            mu.amount = amt
+            db.session.add(mu)
+        except Exception:
+            pass
+
+    # If client sent explicit materials_used array, use it
+    if isinstance(materials_used_payload, list):
+        for item in materials_used_payload:
+            add_usage(item.get('material_id'), item.get('amount'))
+
+    # Parse poison bait section
+    pb_mat = _get(poison, 'used_material_id', 'benyttet_giftaate_id', 'benyttet_giftåte_id')
+    pb_amt = _get(poison, 'refilled_grams', 'giftaate_etterfylt', 'giftåte_etterfylt')
+    if pb_mat is not None or pb_amt is not None:
+        add_usage(pb_mat, pb_amt)
+
+    # Parse non-poison bait section
+    npb_mat = _get(nonpoison, 'used_material_id', 'benyttet_giftfritt_aate_id', 'benyttet_giftfritt_åte_id')
+    npb_amt = _get(nonpoison, 'refilled_grams', 'giftfritt_etterfylt')
+    if npb_mat is not None or npb_amt is not None:
+        add_usage(npb_mat, npb_amt)
+
     db.session.commit()
     return jsonify(s.to_dict()), 201
+
+
+@app.route('/api/materials', methods=['GET'])
+@login_required
+def list_materials() -> ResponseReturnValue:
+    """List materials with optional filtering by material_type.
+
+    Query params:
+      - type: filter by material_type value (e.g., 'Giftåte', 'Giftfritt Åte')
+      - q: optional case-insensitive substring filter on name
+    """
+    q = Material.query
+    mtype = request.args.get('type')
+    if mtype:
+        q = q.filter(Material.material_type == mtype)
+    name_q = request.args.get('q')
+    if name_q:
+        like = f"%{name_q}%"
+        q = q.filter(Material.name.ilike(like))
+    items = q.order_by(Material.name.asc()).all()
+    return jsonify([m.to_dict() for m in items])
 
 
 @app.route('/api/visits/<int:visit_id>/complete', methods=['POST'])

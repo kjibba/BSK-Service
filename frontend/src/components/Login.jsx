@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 export default function Login(){
   const { user, login, logout } = useAuth()
   const [email, setEmail] = useState('')
+  const [err, setErr] = useState('')
   if (user) {
     return (
       <div className="card" style={{maxWidth:480, margin:'0 auto'}}>
@@ -23,8 +24,9 @@ export default function Login(){
     <div className="card" style={{maxWidth:480, margin:'0 auto'}}>
       <h3>Logg inn</h3>
       <p>Skriv inn e-postadressen din for å logge inn.</p>
-      <form onSubmit={(e)=>{ e.preventDefault(); if (email) login(email).then(()=> window.location.hash = 'customers') }}>
+      <form onSubmit={async (e)=>{ e.preventDefault(); setErr(''); if (email) { try{ await login(email); window.location.hash = 'customers' } catch (err){ setErr(err.message || 'Innlogging feilet') } } }}>
         <input className="input" type="email" placeholder="epost@firma.no" value={email} onChange={e=> setEmail(e.target.value)} required />
+        {err ? <div className="error" style={{color:'#b00020', marginTop:8}}>{err}</div> : null}
         <button className="btn primary" type="submit" style={{marginTop:12}}>Logg inn</button>
       </form>
     </div>

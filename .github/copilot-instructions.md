@@ -1,63 +1,52 @@
-# Copilot instructions for BSK Service App
+## Copilot-instruksjoner for BSK Service App
 
-This repository contains a Flask backend and a React + Vite frontend focused on a map-first equipment management UX. The goal of this guide is to give an AI coding agent the exact, actionable knowledge it needs to be productive immediately.
+Kort, håndfast guide for AI-agenter som skal jobbe i dette repoet (Flask backend + React/Vite frontend, map-first UX).
 
-Overview
-- Backend: Flask + SQLAlchemy in `backend/` (entry `backend/app.py`). DB migrations live in `migrations/versions/` (Alembic via Flask-Migrate).
-- Frontend: React + Vite in `frontend/`. Key UI lives in `frontend/src/components/CustomerDetail.jsx` (map + popup-driven flows) and `MapView.jsx`. API client: `frontend/src/api.js`.
-- DB: MySQL/MariaDB (configured in `backend/app.py`). Equipment uses `equipment_type_id` + `properties` (JSON) for typed fields.
+1) Rask sjekkliste for endringer
+- Forstå avhengigheter: `backend/app.py`, `backend/extensions.py`, `backend/models.py`, `migrations/`.
+- Frontend-punkter: `frontend/src/components/CustomerDetail.jsx`, `frontend/src/components/MapView.jsx`, `frontend/src/api.js`.
+- Behold `db`-instansen fra `backend/extensions.py` (bruk pakkestier ved imports).
 
-Quick dev commands (PowerShell)
-- Start backend (dev):
-  & .venv/Scripts/Activate.ps1; cd backend; $env:PYTHONPATH='F:/dev/BSK_Service_App'; python app.py
-- Run migrations (from backend):
-  & .venv/Scripts/Activate.ps1; cd backend; $env:FLASK_APP='app.py'; $env:PYTHONPATH='F:/dev/BSK_Service_App'; python -m flask db upgrade -d ../migrations
-- Start frontend (Vite):
-  cd frontend; npm install; npm run dev  # Vite will choose a free port if 5173 is busy
+2) Arkitektur (kort)
+- Backend: Flask + SQLAlchemy. Entrypunkt: `backend/app.py`. DB-konfig i `app.py`.
+- Migrations: Alembic/Flask-Migrate under `migrations/versions/`.
+- Frontend: React + Vite. Kart- og CRUD-UX er Leaflet-popup-basert i `CustomerDetail.jsx`/`MapView.jsx`.
 
-Project-specific conventions
-- Map-first UX: equipment CRUD is popup-driven inside Leaflet popups. `CustomerDetail.jsx` constructs popup HTML strings and binds event handlers inside `popupopen` handlers. When modifying these flows, preserve exact classnames used by JS (e.g. `.btn-save-new`, `.new-eq-type`).
-- API: `frontend/src/api.js` mirrors backend endpoints. Add client helpers there when adding endpoints.
-- Equipment typing: types are modeled in `backend/models.py` as `EquipmentType` and stored in `equipment_types`; equipment rows use `properties` (JSON) for per-instance data.
-- Scripts: utility/seed scripts live in `backend/scripts/` and run under Flask app context (import `backend.app`). Run them from the `backend` folder with `python scripts/<script>.py`.
+3) Hurtigstart (PowerShell)
+& .venv/Scripts/Activate.ps1; cd backend; $env:PYTHONPATH='F:/dev/BSK_Service_App'; python app.py
+& .venv/Scripts/Activate.ps1; cd backend; $env:FLASK_APP='app.py'; $env:PYTHONPATH='F:/dev/BSK_Service_App'; python -m flask db upgrade -d ../migrations
+cd frontend; npm install; npm run dev
 
-Pedagogical rules (project root guidance merged)
-- Prefer short, clear explanations in code and PR comments. When adding code, include a brief comment explaining what it does and why.
-- Keep examples short and concrete. If you add an API route, include a minimal `curl` or Flask `test_client` example.
-- Follow PEP8 for Python. Use descriptive names and break up long functions.
-- Use package imports (e.g. `backend.extensions`, `backend.models`) to avoid import issues. Reuse the `db` instance from `backend/extensions.py` (do not create new instances).
+4) Viktige mønstre og prosjektkonvensjoner
+- Equipment-typing: `EquipmentType` i `backend/models.py`; equipment-rader bruker `properties` (JSON) for per-instance felter.
+- Popup-UX: `CustomerDetail.jsx` bygger HTML-strenger for Leaflet-popups og binder events i `popupopen`. Ikke reformater disse HTML-strengene — behold klasse-navn som `.btn-save-new`, `.new-eq-type`.
+- API-klient: alle helpers samles i `frontend/src/api.js`. Legg nye klient-funksjoner der for konsistens.
+- Scripts i `backend/scripts/` kjøres under Flask-app-kontekst (importer `backend.app` og kjør fra `backend/`).
 
-Migrations & DB workflow
-- When adding models/fields:
-  1) Add/modify `backend/models.py`.
-  2) Generate migration: `flask db migrate -m "desc"` (from backend, ensure FLASK_APP & PYTHONPATH set).
-  3) Inspect `migrations/versions/` and, if multiple heads exist, run `flask db heads` and merge with `flask db merge <rev1> <rev2>`.
-  4) Apply: `flask db upgrade -d ../migrations`.
-- Commit migration files into `migrations/versions/` with the model change.
+5) Migrations & DB-arbeidsflyt (konkret)
+- Legg til/endre modeller i `backend/models.py`.
+- Fra `backend/`: `flask db migrate -m "<desc>"` (sett FLASK_APP og PYTHONPATH som vist over).
+- Sjekk `migrations/versions/`; ved flere heads: `flask db heads` og `flask db merge <rev1> <rev2>`.
+- Apply: `python -m flask db upgrade -d ../migrations`.
 
-Common pitfalls & tips
-- Alembic multiple heads: prefer creating a merge revision and ensuring `down_revision` matches the merged parent.
-- Popup DOM edits: `CustomerDetail.jsx` uses fragile string-HTML for popups — avoid reformatting the HTML strings when only adding handlers; keep classnames stable.
-- Google maps mutant loads asynchronously — code initializes layers either on script load or if the script was already present; call `map.invalidateSize(true)` after switching base layers.
-- Images: placement photos are saved to `backend/static/uploads/` and served via `/static/uploads/<file>` in dev; production must use validated uploads and a proper storage backend.
+6) Eksempel: Legge til en enkel API-rute
+- Opprett blueprint i `backend/routes/` (se `equipment_types.py` for mønster).
+- Returner `jsonify(model.to_dict())`.
+- Legg til frontend-helper i `frontend/src/api.js` og kall fra komponent.
+- Test: bruk Flask `test_client` eller frontend manuelt via Vite.
 
-How to add an API endpoint (concrete)
-1. Create a blueprint in `backend/routes/` following `equipment_types.py` pattern. Return `jsonify(model.to_dict())`.
-2. Add client helpers in `frontend/src/api.js` (list/create/update/delete).
-3. Update UI components (prefer `toast.push` for error/success feedback). Test manually via the frontend or `flask test_client` in small unit examples.
+7) Små, viktige tips
+- Bruk pakkestier ved imports (f.eks. `from backend.extensions import db`). Ikke opprett nye `db`-instanser.
+- Bilder: dev-server servicerer `backend/static/uploads/` via `/static/uploads/<file>`.
+- Git: commit migrations og modeller sammen.
+- Når du endrer popup-HTML, begrens endringer til nødvendig DOM — mye bindinger antar spesifikke klasse-navn.
 
-Developer ergonomics
-- Terminal: PowerShell. Use `;` to chain commands and `&` to run scripts from the venv activation.
-- Linting: run `npm run lint` or `npx eslint ...` for frontend; fix ESLint warnings where possible. Keep changes minimal when editing `CustomerDetail.jsx` because it's large and fragile.
-- Git: commit migrations, seeds, and code together when adding model changes. Add short explanatory commit messages.
+8) Nøkkelfiler å lese først
+- `backend/app.py`, `backend/extensions.py`, `backend/models.py`, `backend/routes/equipment.py`, `backend/routes/equipment_types.py`
+- `frontend/src/components/CustomerDetail.jsx`, `frontend/src/components/MapView.jsx`, `frontend/src/api.js`
 
-Files to read first
-- `backend/app.py`, `backend/models.py`, `backend/routes/equipment.py`, `backend/routes/equipment_types.py`, `frontend/src/components/CustomerDetail.jsx`, `frontend/src/api.js`.
+Gi beskjed hvis du vil at jeg skal:
+- Lage en kort «how-to» commit-mal for migrasjoner.
+- Legge inn en template for nye blueprints + frontend-helper.
 
-If you need more
-- Ask for a focused codewalk of any file (I can produce a short summary of hot spots and safe edit points).
-- If you want, I can insert small, well-documented examples into any file (route + client + small UI hook) and run quick dev validations.
-
----
-If anything here is unclear or you want translation/extra Norwegian guidance, tell me which section to expand.
-Hold all kommunikasjon med bruker på norsk
+Be om avklaring eller område jeg bør utvide.

@@ -34,11 +34,16 @@ export const VisitsAPI = {
   },
   complete: (id, payload) => api.post(`/visits/${id}/complete`, payload).then(r => r.data),
   assign: (id, technicianId) => api.post(`/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
+  office: {
+    create: (payload) => api.post('/office/visits', payload).then(r => r.data),
+    assign: (id, technicianId) => api.post(`/office/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
+  }
 }
 
 export const ServiceLogsAPI = {
   list: (params) => api.get('/service-logs', { params }).then(r => r.data),
   create: (payload) => api.post('/service-logs', payload).then(r => r.data),
+  update: (id, payload) => api.put(`/service-logs/${id}`, payload).then(r => r.data),
 }
 
 export const MapAPI = {
@@ -61,4 +66,15 @@ export const EquipmentTypesAPI = {
   create: (payload) => api.post('/equipment-types', payload).then(r => r.data),
   update: (id, payload) => api.put(`/equipment-types/${id}`, payload).then(r => r.data),
   delete: (id) => api.delete(`/equipment-types/${id}`).then(r => r.data),
+}
+
+export const MaterialsAPI = {
+  list: (type, q) => api.get('/materials', { params: { type, q } }).then(r => r.data),
+}
+
+export const FeedbackAPI = {
+  submit: (payload) => api.post('/feedback', payload).then(r => r.data),
+  list: (tail) => api.get('/feedback', { params: { tail } }).then(r => r.data),
+  detail: (id) => api.get(`/feedback/${id}`).then(r => r.data),
+  update: (id, payload) => api.put(`/feedback/${id}`, payload).then(r => r.data),
 }
