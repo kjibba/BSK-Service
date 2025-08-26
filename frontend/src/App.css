@@ -10,6 +10,8 @@
   --border: #e2e8f0;
   --radius: 10px;
   --shadow: 0 6px 24px rgba(2, 6, 23, 0.08);
+  --overlay-bg: rgba(255,255,255,0.98);
+  --overlay-border: var(--border);
 }
 
 html, body, #root {
@@ -60,17 +62,17 @@ p { color: var(--muted); }
   border-bottom: 1px solid var(--border);
   overflow-x: hidden;
 }
+/* header-actions placed top-right and aligned with container */
+.header-actions { display: flex; gap: 8px; align-items: center; margin-left: 12px }
+.theme-toggle-btn { border-radius: 8px }
 .brand { font-weight: 800; letter-spacing: 0.3px; }
 .nav { display: flex; gap: 12px; align-items: center; flex-wrap: nowrap; }
 .nav-link { color: var(--text); padding: 6px 8px; border-radius: 8px; }
 .nav-link:hover { background: #f1f5f9; text-decoration: none; }
-.nav-link.active { background: #e2e8f0; font-weight: 700; }
+.nav-link.active { background: var(--nav-active-bg, #e2e8f0); color: var(--nav-active-color, var(--text)); font-weight: 700; }
 
 /* Login link pinned to top-right */
 .login-link {
-  position: absolute;
-  right: 12px;
-  top: 8px;
   background: transparent;
   padding: 6px 10px;
   border-radius: 8px;
@@ -78,9 +80,61 @@ p { color: var(--muted); }
 }
 .login-link:hover { background: #f1f5f9; }
 
+/* Dark mode header/footer overrides */
+/* Dark mode: set design tokens so components inherit dark values */
+html[data-theme='dark'] {
+  --brand: #e6eef8;
+  --brand-600: #dbeaf8;
+  --accent: #60a5fa;
+  --text: #e6eef8;
+  --muted: #94a3b8;
+  --bg: #071022;
+  --surface: #07121a;
+  --border: rgba(255,255,255,0.04);
+  --overlay-bg: rgba(7,18,34,0.92);
+  --overlay-border: rgba(255,255,255,0.08);
+}
+/* Active nav/link colors for dark theme */
+html[data-theme='dark'] { --nav-active-bg: rgba(255,255,255,0.08); --nav-active-color: #ffffff }
+
+html[data-theme='dark'] .site-header { background: var(--surface) !important; color: var(--text); box-shadow: none; border-bottom-color: rgba(255,255,255,0.04) }
+/* Dark theme variables: improve contrast for active nav items */
+html[data-theme='dark'] {
+  --nav-active-bg: rgba(255,255,255,0.12);
+  --nav-active-color: #ffffff;
+}
+html[data-theme='dark'] .login-link, html[data-theme='dark'] .nav-link { color: var(--text) }
+html[data-theme='dark'] .nav-link:hover, html[data-theme='dark'] .login-link:hover { background: rgba(255,255,255,0.03) }
+html[data-theme='dark'] .hero { background: linear-gradient(180deg, rgba(7,18,34,0.6), transparent) }
+html[data-theme='dark'] .card { background: var(--surface); border-color: var(--border); box-shadow: 0 6px 18px rgba(2,6,23,0.5) }
+html[data-theme='dark'] input, html[data-theme='dark'] select, html[data-theme='dark'] textarea { background: #07121a; border-color: rgba(255,255,255,0.04); color: var(--text) }
+html[data-theme='dark'] button, html[data-theme='dark'] .btn { background: linear-gradient(180deg,#0f172a,#071022); color: var(--text); border-color: rgba(255,255,255,0.03) }
+html[data-theme='dark'] footer { background: #020617 }
+
+/* Ensure footer text has sufficient contrast in dark theme */
+footer p { color: var(--muted); }
+html[data-theme='dark'] footer p { color: var(--text); font-size: 14px; }
+
+/* Dark theme legend adjustments (mobile) */
+@media (max-width: 640px) {
+  html[data-theme='dark'] .map-legend {
+    background: rgba(7, 18, 34, 0.92);
+    border-color: rgba(255,255,255,0.08);
+    color: #e6eef8;
+  }
+}
+
 /* Header/logo responsive tweaks */
 .site-header .brand img { height: 36px; width: auto; display: block; }
 .site-header .brand span { display: inline-block; vertical-align: middle; }
+
+/* In dark theme, place a light background behind the logo image so any black text in the image remains visible */
+html[data-theme='dark'] .site-header .brand img {
+  background: rgba(255,255,255,0.6); /* even more discreet */
+  padding: 3px 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.04);
+}
 /* On smaller screens, truncate long brand text so it doesn't force horizontal scroll */
 @media (max-width: 640px) {
   .site-header .brand span {
@@ -191,14 +245,14 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
 
 /* Map container responsive height */
 .map-container {
-  height: 72vh;
+  height: 62vh;
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 @media (max-width: 640px) {
   .map-container {
-    height: 85vh;
+  height: 65vh;
   }
 }
 
@@ -208,29 +262,38 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
   position: absolute;
   top: 10px;
   right: 10px;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid var(--border);
+  background: var(--overlay-bg);
+  border: 1px solid var(--overlay-border);
   border-radius: 8px;
   padding: 6px 8px;
   font-size: 13px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  z-index: 400; /* above tiles */
+  z-index: 600; /* below sticky header (1000) */
 }
 .map-legend .dot { display:inline-block; width:10px; height:10px; border-radius:999px; margin-right:4px; }
 
-/* Compact basemap toggle */
+/* Remove default white background and border from Leaflet DivIcons used as status markers */
+.leaflet-div-icon.status-marker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Compact basemap toggle (original baseline: top-left, below Leaflet zoom) */
 .map-toggle {
   position: absolute;
-  left: 10px;
-  top: 10px;
+  top: 8px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   display: flex;
   gap: 6px;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid var(--border);
+  background: var(--overlay-bg);
+  border: 1px solid var(--overlay-border);
   border-radius: 8px;
   padding: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  z-index: 401;
+  z-index: 650; /* below sticky header (1000) */
 }
 .map-toggle button {
   appearance: none;
@@ -246,6 +309,17 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
   color: #ffffff;
   border-color: #0f172a;
 }
+
+@media (max-width: 640px) {
+  /* On small devices, place toggle top-left */
+  .map-toggle { top: 8px; left: 8px; right: auto; transform: none; padding: 1px 2px; gap: 3px }
+  .map-toggle button { padding: 2px 6px; font-size: 10.5px }
+  /* Reduce legend size a bit more on mobile */
+  .map-legend { font-size: 11.5px; padding: 3px 6px }
+  .map-legend .dot { width: 8px; height: 8px }
+}
+/* Dark theme legend/toggle share overlay vars already; ensure text color is readable */
+html[data-theme='dark'] .map-legend, html[data-theme='dark'] .map-toggle { color: #e6eef8 }
 
 /* Bottom tab bar for mobile */
 .bottom-tabbar {
@@ -269,7 +343,7 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
   padding: 8px 12px;
   border-radius: 8px;
 }
-.tab-btn.active { color: #0f172a; background: #e2e8f0; }
+.tab-btn.active { color: var(--nav-active-color, #0f172a); background: var(--nav-active-bg, #e2e8f0); }
 @media (min-width: 900px) {
   .bottom-tabbar { display: none; }
 }
@@ -278,6 +352,29 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
 .list { list-style: none; padding: 0; margin: 0; }
 .list li { padding: 6px 4px; border-bottom: 1px dashed var(--border); }
 .list li:last-child { border-bottom: 0; }
+
+/* Missions list: clearer item separation and status accents */
+.missions-list { gap: 0; }
+.missions-list .list-item.mission {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 12px 0; /* stack items with even spacing */
+  box-shadow: 0 2px 8px rgba(2,6,23,0.04);
+  width: 100%;
+}
+.missions-list .list-item.mission:hover { box-shadow: 0 4px 14px rgba(2,6,23,0.08) }
+
+/* left status indicator via border (ensures flush left alignment) */
+.missions-list .mission.status-planned { border-left: 4px solid #3b82f6; }
+.missions-list .mission.status-ongoing { border-left: 4px solid #16a34a; }
+.missions-list .mission.status-other { border-left: 4px solid #94a3b8; }
+
+/* Compact actions on narrow screens */
+@media (max-width: 640px) {
+  .missions-list .list-item.mission { padding: 8px 10px; margin: 0 0 10px 0 }
+}
 
 /* Hero */
 .hero { background: linear-gradient(180deg, var(--surface), transparent); }
@@ -291,3 +388,16 @@ textarea.input, textarea { width: 100%; box-sizing: border-box; padding: 10px 12
 .toast-success { border-color: #bbf7d0; }
 .toast-error { border-color: #fecaca; }
 .toast-info { border-color: #bae6fd; }
+
+/* Keep Leaflet zoom bottom-left on mobile */
+@media (max-width: 640px) {
+  .leaflet-top.leaflet-left,
+  .leaflet-control-zoom {
+    top: auto !important;
+    bottom: 8px !important;
+    left: 8px !important;
+    right: auto !important;
+  }
+}
+
+/* end */

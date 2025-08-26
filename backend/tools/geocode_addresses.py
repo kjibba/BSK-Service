@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 import re
 import requests
 from flask import Flask
+from typing import Optional, Tuple, List
 
 from backend.extensions import db
 from backend.models import Customer
@@ -11,13 +12,18 @@ from backend.models import Customer
 
 def create_app():
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://bsk_user:et_sikkert_passord@localhost/bsk_service_db'
+    default_dsn = 'mysql+pymysql://bsk_user:et_sikkert_passord@localhost/bsk_service_db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_dsn)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {
+        'pool_pre_ping': True,
+        'pool_recycle': 280,
+    })
     db.init_app(app)
     return app
 
 
-def _norm_postcode(pc: str | None) -> str | None:
+def _norm_postcode(pc: Optional[str]) -> Optional[str]:
     if not pc:
         return None
     s = str(pc).strip()
@@ -37,7 +43,7 @@ def build_query(customer: Customer) -> str:
     pc = _norm_postcode(getattr(customer, 'postal_code', None))
     # If address already contains the same postcode, don't add it again
     addr_has_pc = bool(pc and re.search(rf"\b{re.escape(pc)}\b", address))
-    parts: list[str] = []
+    parts: List[str] = []
     if address:
         parts.append(address)
     if pc and not addr_has_pc:
@@ -47,7 +53,7 @@ def build_query(customer: Customer) -> str:
     parts.append('Norge')
     # Deduplicate while preserving order (case-insensitive)
     seen = set()
-    uniq: list[str] = []
+    uniq: List[str] = []
     for p in parts:
         key = p.lower()
         if key in seen:
@@ -57,7 +63,7 @@ def build_query(customer: Customer) -> str:
     return ", ".join(uniq)
 
 
-def geocode(query: str, user_agent: str) -> tuple[float | None, float | None]:
+def geocode(query: str, user_agent: str) -> Tuple[Optional[float], Optional[float]]:
     base = 'https://nominatim.openstreetmap.org/search'
     params = {
         'q': query,

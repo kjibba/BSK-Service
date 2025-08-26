@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+    container_name: bsk_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    depends_on:
+      - backend
+    networks:
+      - bsk_net
+
+  backend:
+    build:
+      context: ./backend-nodejs
+      dockerfile: Dockerfile
+    container_name: bsk_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=${BACKEND_PORT:-8000}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+    expose:
+      - "${BACKEND_PORT:-8000}"
+    depends_on:
+      - db
+    networks:
+      - bsk_net
+
+  db:
+    image: mariadb:10.6
+    container_name: bsk_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - bsk_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+
+networks:
+  bsk_net:
+    driver: bridge

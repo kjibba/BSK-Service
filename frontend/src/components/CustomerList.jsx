@@ -1,18 +1,38 @@
 import { useState, useEffect } from 'react';
-import { CustomersAPI, EquipmentAPI, VisitsAPI, ServiceLogsAPI } from '../api';
-import Button from './ui/Button';
-import Card from './ui/Card';
+import { CustomersAPI } from '../api';
 import { Loading, ErrorState } from './ui/States';
+import { RequireAuth } from './auth';
+
+// Colors and status logic reused from MapView
+const COLORS = { green: '#16a34a', yellow: '#f59e0b', red: '#dc2626' };
+const statusFor = (nextVisitIso) => {
+  if (!nextVisitIso) return 'red';
+  const now = new Date();
+  const next = new Date(nextVisitIso);
+  const diffDays = Math.ceil((next - now) / (1000 * 60 * 60 * 24));
+  if (diffDays < -1) return 'red';
+  if (diffDays <= 30) return 'yellow';
+  return 'green';
+};
 
 const CustomerList = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sortMode, setSortMode] = useState('next'); // 'next' | 'alpha'
 
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const data = await CustomersAPI.list();
+        setLoading(true);
+        let data = [];
+        if (sortMode === 'next') {
+          data = await CustomersAPI.list({ include: 'next_visit', sort: 'next_visit' });
+        } else {
+          data = await CustomersAPI.list({ include: 'next_visit' });
+          // Alfabetisk klient-side sortering (norsk locale)
+          data.sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'nb', { sensitivity: 'base' }));
+        }
         setCustomers(data);
       } catch (e) {
         console.debug(e)
@@ -22,144 +42,51 @@ const CustomerList = () => {
       }
     };
     fetchCustomers();
-  }, []);
-
-  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
-  useEffect(() => {
-    if (customers.length && !selectedCustomerId) {
-      setSelectedCustomerId(customers[0].id);
-    }
-  }, [customers, selectedCustomerId]);
-
-  const [newCustomer, setNewCustomer] = useState({ name: '', address: '' });
-  const [creating, setCreating] = useState(false);
-  const createCustomer = async () => {
-    try {
-      setCreating(true);
-      const created = await CustomersAPI.create(newCustomer);
-      setCustomers(prev => [...prev, created]);
-      setNewCustomer({ name: '', address: '' });
-      setSelectedCustomerId(created.id);
-    } catch (e) {
-      console.debug(e)
-      setError('Kunne ikke opprette kunde. ' + (e?.message || String(e)));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const [newEquipment, setNewEquipment] = useState({ name: '', type: '' });
-  const [newVisit, setNewVisit] = useState({ visit_date: '', technician: '' });
-  const [equipments, setEquipments] = useState([]);
-  const [visits, setVisits] = useState([]);
-  const [serviceLogs, setServiceLogs] = useState([]);
-
-  useEffect(() => {
-    const fetchLists = async () => {
-      try {
-        const [eq, vi] = await Promise.all([EquipmentAPI.list(), VisitsAPI.list({ customer_id: selectedCustomerId })]);
-        setEquipments(eq);
-        setVisits(vi);
-        const logs = await ServiceLogsAPI.list({ customer_id: selectedCustomerId });
-        setServiceLogs(logs);
-      } catch (e) {
-        console.debug(e)
-      }
-    };
-    if (selectedCustomerId) fetchLists();
-  }, [selectedCustomerId]);
-
-  const firstCustomerId = selectedCustomerId;
-
-  const createEquipment = async () => {
-    if (!firstCustomerId) return;
-    try {
-      const created = await EquipmentAPI.create({ customer_id: firstCustomerId, ...newEquipment });
-      setEquipments(prev => [...prev, created]);
-      setNewEquipment({ name: '', type: '' });
-    } catch (e) {
-      console.debug(e)
-    }
-  };
-  const createVisit = async () => {
-    if (!firstCustomerId) return;
-    try {
-      const created = await VisitsAPI.create({ customer_id: firstCustomerId, visit_date: newVisit.visit_date, technician: newVisit.technician });
-      setVisits(prev => [created, ...prev]);
-      setNewVisit({ visit_date: '', technician: '' });
-    } catch (e) {
-      console.debug(e)
-    }
-  };
+  }, [sortMode]);
 
   if (loading) return <Loading />
-
   if (error) return <ErrorState message={error} />
 
   return (
-    <div>
-      <h1 style={{margin:'8px 0 12px'}}>Kundeliste</h1>
-    <Card title="Ny kunde" style={{marginBottom: 16}}>
-        <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-          <input placeholder="Navn" value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer, name:e.target.value})} />
-          <input placeholder="Adresse" value={newCustomer.address} onChange={e=>setNewCustomer({...newCustomer, address:e.target.value})} />
-      <Button variant="primary" onClick={createCustomer} disabled={creating || !newCustomer.name}>Opprett</Button>
-        </div>
-      </Card>
-
-      <div className="layout-columns">
-        <div className="col">
-          <h2>Kunder</h2>
-          <ul className="list">
-            {customers.map((customer) => (
-              <li key={customer.id} style={{cursor:'pointer'}} onClick={()=>{ setSelectedCustomerId(customer.id); window.location.hash = `customer:${customer.id}` }}>
-                <span style={{fontWeight: selectedCustomerId===customer.id?'bold':'normal'}}>{customer.name}</span>
-              </li>
-            ))}
-          </ul>
+    <RequireAuth>
+      <div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'8px 0 12px', gap: 12}}>
+          <h1 style={{margin:0}}>Kunder</h1>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <label htmlFor="sortmode" style={{fontSize:12, color:'#555'}}>Sorter:</label>
+            <select id="sortmode" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+              <option value="next">Neste besøk</option>
+              <option value="alpha">Alfabetisk</option>
+            </select>
+            <button className="btn" onClick={() => (location.hash = '#customer:new')}>Ny kunde</button>
+          </div>
         </div>
 
-        <div className="col" style={{flex: 2}}>
-          <h2>Besøk for valgt kunde</h2>
-      <Card style={{marginBottom: 16}}>
-            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-              <input placeholder="YYYY-MM-DDTHH:mm:ss" value={newVisit.visit_date} onChange={e=>setNewVisit({...newVisit, visit_date:e.target.value})} />
-              <input placeholder="Tekniker" value={newVisit.technician} onChange={e=>setNewVisit({...newVisit, technician:e.target.value})} />
-        <Button variant="primary" onClick={createVisit} disabled={!firstCustomerId || !newVisit.visit_date}>Opprett</Button>
-            </div>
-          </Card>
-          <ul>
-            {visits.map((v) => (
-              <li key={v.id}>{v.visit_date} {v.technician ? `— ${v.technician}` : ''}</li>
-            ))}
-          </ul>
-
-          <h2>Servicelogger for valgt kunde</h2>
-          <ul>
-            {serviceLogs.map((s) => (
-              <li key={s.id}>{s.log_date || '—'} — utstyr #{s.equipment_id}: {s.description?.slice(0,80)}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="col">
-          <h2>Utstyr (alle)</h2>
-      <Card style={{marginBottom: 16}}>
-            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-              <input placeholder="Navn" value={newEquipment.name} onChange={e=>setNewEquipment({...newEquipment, name:e.target.value})} />
-              <input placeholder="Type" value={newEquipment.type} onChange={e=>setNewEquipment({...newEquipment, type:e.target.value})} />
-        <Button variant="primary" onClick={createEquipment} disabled={!firstCustomerId || !newEquipment.name}>Opprett</Button>
-            </div>
-          </Card>
-          <ul>
-            {equipments.map((e) => (
-              <li key={e.id}>{e.name} ({e.type || '–'})</li>
-            ))}
-          </ul>
+        <div className="customer-list">
+          {customers.length === 0 && <div style={{opacity:.7}}>Ingen kunder å vise.</div>}
+          {customers.map(c => {
+            const status = c.status || statusFor(c.next_visit_date || c.planned_next_visit_date || c.expected_service_date);
+            const dotColor = COLORS[status] || COLORS.red;
+            const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleDateString() : (c.planned_next_visit_date ? new Date(c.planned_next_visit_date).toLocaleDateString() : 'Ikke planlagt');
+            return (
+              <div key={c.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid #eee'}}>
+                <div style={{display:'flex', gap:12, alignItems:'center'}}>
+                  <span style={{width:14, height:14, borderRadius:7, background:dotColor, display:'inline-block', boxShadow:'0 0 0 2px rgba(255,255,255,0.9)'}} />
+                  <div>
+                    <div style={{fontWeight:600}}><a href={`#customer:${c.id}`}>{c.name}</a></div>
+                    <div style={{fontSize:12, color:'#666'}}>Neste: {nextText}</div>
+                  </div>
+                </div>
+                <div>
+                  <button className="btn" onClick={() => location.hash = `#customer:${c.id}`}>Detaljer</button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
-    </div>
-  );
-};
+    </RequireAuth>
+  )
+}
 
 export default CustomerList;

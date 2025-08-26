@@ -56,6 +56,33 @@ npm run dev -- --host
 
 Open the frontend URL in your browser (Vite output shows the exact port). The frontend proxies `/api` to the backend during development.
 
+## Run backend in Docker (NAS-friendly)
+If you want the backend to run on a NAS (e.g., Synology) or any always-on host with Docker:
+
+1) Build and run with docker-compose
+	- Ensure Docker is installed on the host.
+	- Set DATABASE_URL in the environment (shell or .env next to docker-compose.yml).
+
+```powershell
+# On the host where Docker is installed
+cd F:\dev\BSK_Service_App
+$env:DATABASE_URL = 'postgresql://user:password@dbhost:5432/dbname'
+docker compose up -d --build
+```
+
+2) What it does
+	- Builds an image from `docker/backend.Dockerfile`.
+	- Runs Alembic migrations at container start, then serves with Waitress on port 8000.
+	- Persists uploads via bind mount: `./backend/static/uploads`.
+
+3) Access
+	- Backend: http://HOST_IP:8000
+
+Troubleshooting
+- Ensure the DB is reachable from the NAS host.
+- If migrations fail, check container logs: `docker compose logs -f backend`.
+- Verify `DATABASE_URL` is correct (username/password/host/port/dbname).
+
 ## Useful scripts
 - `backend/scripts/promote_manager.py <email> [name]` — create or promote an employee to role `manager`.
 - `backend/scripts/count_employees.py` — prints employees from the DB (debugging)
@@ -76,4 +103,10 @@ Open the frontend URL in your browser (Vite output shows the exact port). The fr
 This project is internal; add a license file if you will publish.
 
 ---
+## Copilot instructions
+This repository contains a canonical Copilot instruction file with project-specific rules and guidelines for automated agents.
+Please read `.github/copilot-instructions.md` before requesting code changes or automated edits.
+
+The file explains coding style, where to place new code, migration workflow, PowerShell examples and other helpful conventions.
+
 If you want, I can also create a minimal `requirements.txt` and a `README` section tailored to production deployment.

@@ -1,8 +1,11 @@
+
 Flask>=2.2
 Flask-Login
 Flask-Migrate
 Flask-CORS
 Flask-SQLAlchemy
-PyMySQL
+# Pin PyMySQL due to incompatibilities with some MariaDB builds on NAS devices
+PyMySQL==1.0.3
+mysql-connector-python
 alembic
 requests

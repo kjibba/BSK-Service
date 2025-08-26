@@ -3,6 +3,7 @@ from flask.typing import ResponseReturnValue
 from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin, current_user as flask_login_user
+from typing import Optional
 
 from backend.extensions import db
 from backend.models import Customer, Visit, Equipment, ServiceLog, Employee, Material, MaterialUsage, Feedback
@@ -21,9 +22,40 @@ except Exception:  # pragma: no cover
 
 # Grunnleggende App-konfigurasjon
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://bsk_user:et_sikkert_passord@localhost/bsk_service_db'
+# Config from env with safe fallbacks
+default_dsn = 'mysql+pymysql://bsk_user:et_sikkert_passord@localhost/bsk_service_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_dsn)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = app.config.get('SECRET_KEY') or 'dev-secret-change-me'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+# Engine options for MariaDB/MySQL stability on NAS
+_engine_opts = {
+    # Keep pool healthy on NAS and long-lived connections
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+}
+# Optional TLS for MariaDB/MySQL (Synology often enforces/uses non-default ports)
+# If the server requires secure transport, enable TLS by setting MYSQL_SSL_MODE=require
+# Optionally provide CA/cert/key paths via MYSQL_SSL_CA / MYSQL_SSL_CERT / MYSQL_SSL_KEY
+try:
+    _ssl_mode = (os.environ.get('MYSQL_SSL_MODE') or os.environ.get('DB_SSL_MODE') or '').strip().lower()
+    if _ssl_mode in ('require', 'on', 'true', 'enabled'):
+        ssl_args = {}
+        ca = os.environ.get('MYSQL_SSL_CA')
+        cert = os.environ.get('MYSQL_SSL_CERT')
+        key = os.environ.get('MYSQL_SSL_KEY')
+        if ca:
+            ssl_args['ca'] = ca
+        if cert:
+            ssl_args['cert'] = cert
+        if key:
+            ssl_args['key'] = key
+        # For PyMySQL, passing an (even empty) dict under 'ssl' enables TLS
+        _engine_opts['connect_args'] = {'ssl': ssl_args}
+except Exception:
+    # Fail open to avoid breaking local dev if envs are malformed
+    pass
+
+app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', _engine_opts)
 
 # Initialiser utvidelser
 db.init_app(app)
@@ -46,7 +78,7 @@ CORS(app, supports_credentials=True, resources={
 login_manager = LoginManager(app)
 
 class User(UserMixin):
-    def __init__(self, id: int, email: str, name: str|None = None):
+    def __init__(self, id: int, email: str, name: Optional[str] = None):
         self.id = id
         self.email = email
         self.name = name or email

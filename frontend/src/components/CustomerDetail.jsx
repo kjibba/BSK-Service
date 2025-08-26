@@ -36,6 +36,7 @@ export default function CustomerDetail({ customerId }) {
   const [showVisits, setShowVisits] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
   const [creatingVisit, setCreatingVisit] = useState(false)
+  const [selectedVisits, setSelectedVisits] = useState([])
 
   const load = useCallback(async (opts) => {
     const silent = !!(opts && opts.silent)
@@ -249,8 +250,8 @@ export default function CustomerDetail({ customerId }) {
     try { m.openPopup() } catch (e) { console.debug(e) }
     }
 
-    // Detect active visit for this customer to enable direct service links
-    const activeVisit = (data.visits || []).find(v => (v.status === 'Planlagt' || v.status === 'Pågående'))
+  // Detect active visit for this customer to enable direct service links
+  const activeVisit = (data.visits || []).find(v => v.status === 'Pågående')
     equipment.forEach(e => {
       if (e._lat == null || e._lng == null) return
       const m = L.marker([e._lat, e._lng])
@@ -331,11 +332,12 @@ export default function CustomerDetail({ customerId }) {
         </div>
         <div style={{ marginTop: 10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           {(() => {
-            const active = (data.visits || []).find(v => (v.status === 'Planlagt' || v.status === 'Pågående'))
+            // Kun vis aktiv knapp for pågående oppdrag (ikke planlagt)
+            const active = (data.visits || []).find(v => v.status === 'Pågående')
             if (active) {
               return (
                 <>
-                  <Button type="button" variant="primary" onClick={() => window.location.hash = `visit:${active.id}`}>Oppdrag {active.status?.toLowerCase() === 'pågående' ? 'pågår' : 'planlagt'} — åpne</Button>
+                  <Button type="button" variant="primary" onClick={() => window.location.hash = `visit:${active.id}`}>Oppdrag pågår — åpne</Button>
                   <span style={{ fontSize:12, color:'#475569' }}>Dato: {active.visit_date ? new Date(active.visit_date).toLocaleString() : '-'}</span>
                 </>
               )
@@ -377,6 +379,73 @@ export default function CustomerDetail({ customerId }) {
             <div style={{ display: 'flex', gap: 8 }}>
               <Button variant="primary" type="submit">Lagre</Button>
               <Button type="button" onClick={() => setShowEditCustomer(false)}>Avbryt</Button>
+            </div>
+
+            {/* Posisjonsverktøy: manuell flytting eller forsøk geokoding */}
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Posisjon</div>
+              <div style={{ color: '#475569', fontSize: 13, marginBottom: 8 }}>Flytt markør manuelt på kartet, eller forsøk geokoding basert på adresse.</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <Button type="button" onClick={() => {
+                  try { if (moveMarkerRef.current) { mapRef.current?.removeLayer(moveMarkerRef.current); moveMarkerRef.current = null } } catch(e) { console.debug(e) }
+                  const map = mapRef.current; if (!map) return;
+                  const start = (() => {
+                    const toNum = v => { if (v == null) return null; const s = String(v).replace(',', '.').trim(); const n = Number(s); return Number.isFinite(n) ? n : null };
+                    const cLat = toNum(form.latitude ?? data?.customer?.latitude);
+                    const cLng = toNum(form.longitude ?? data?.customer?.longitude);
+                    if (cLat != null && cLng != null) return [cLat, cLng];
+                    const center = map.getCenter(); return [center.lat, center.lng];
+                  })();
+                  const m = L.marker(start, { draggable: true });
+                  m.addTo(map); moveMarkerRef.current = m;
+                  const html = `<div style="min-width:200px"><div style="font-size:12px;color:#475569;margin-bottom:6px">Flytt kundemarkør til korrekt posisjon.</div><div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn-cancel-move" style="padding:4px 8px;font-size:12px">Avbryt</button><button type="button" class="btn-save-move" style="padding:4px 8px;font-size:12px">Lagre posisjon</button></div></div>`;
+                  m.bindPopup(html, { closeButton: false });
+                  m.on('popupopen', () => {
+                    const root = m.getPopup().getElement();
+                    const btnSave = root.querySelector('.btn-save-move');
+                    const btnCancel = root.querySelector('.btn-cancel-move');
+                    if (btnSave) btnSave.addEventListener('click', async (ev) => {
+                      ev.preventDefault(); ev.stopPropagation();
+                      try {
+                        const ll = m.getLatLng();
+                        await CustomersAPI.fixGeo(customerId, ll.lat, ll.lng);
+                        toast.push({ variant:'success', title:'Lagret', description:'Kundeposisjon oppdatert.' });
+                        try { map.removeLayer(m); moveMarkerRef.current = null } catch{}
+                        await load({ silent:true });
+                      } catch (e) {
+                        console.debug(e);
+                        toast.push({ variant:'error', title:'Feil', description:'Kunne ikke lagre posisjon.' });
+                      }
+                    }, { once:true });
+                    if (btnCancel) btnCancel.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); try { map.removeLayer(m); moveMarkerRef.current = null } catch{} }, { once:true });
+                  });
+                  try { m.openPopup() } catch{}
+                }}>Flytt manuelt</Button>
+
+                <Button type="button" onClick={async () => {
+                  try {
+                    const addr = [form.address || data?.customer?.address || '', form.postal_code || data?.customer?.postal_code || '', form.city || data?.customer?.city || '', 'Norge']
+                      .map(s => String(s||'').trim()).filter(Boolean).join(', ');
+                    if (!addr) { toast.push({ variant:'error', title:'Mangler adresse', description:'Fyll inn adresse, postnr og sted først.' }); return; }
+                    // Nominatim enkel geokoding (rate-limits gjelder)
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=no&q=${encodeURIComponent(addr)}`;
+                    const resp = await fetch(url, { headers: { 'Accept':'application/json' } });
+                    if (!resp.ok) throw new Error('Geokoding feilet');
+                    const js = await resp.json();
+                    const hit = Array.isArray(js) && js[0];
+                    if (!hit || !hit.lat || !hit.lon) { toast.push({ variant:'error', title:'Ingen treff', description:'Fant ikke posisjon for adressen.' }); return; }
+                    const lat = Number(hit.lat), lon = Number(hit.lon);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { toast.push({ variant:'error', title:'Ugyldig koordinat', description:'Geokoding ga ugyldige koordinater.' }); return; }
+                    await CustomersAPI.fixGeo(customerId, lat, lon);
+                    toast.push({ variant:'success', title:'Geokoding', description:'Kundeposisjon oppdatert fra adresse.' });
+                    await load({ silent:true });
+                    try { const map = mapRef.current; if (map) map.setView([lat, lon], 16) } catch{}
+                  } catch (e) {
+                    console.debug(e);
+                    toast.push({ variant:'error', title:'Geokoding feilet', description:'Prøv manuell plassering.' });
+                  }
+                }}>Forsøk geokoding</Button>
+              </div>
             </div>
           </form>
         )}
@@ -623,17 +692,67 @@ export default function CustomerDetail({ customerId }) {
             </div>
             <div style={{ marginTop: 8 }}>
               {!data.visits?.length ? <Empty>Ingen besøk registrert.</Empty> : (
-                <ul className="list">
-                  {data.visits.map(v => (
-                    <li key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{v.title || 'Besøk'}</div>
-                        <div style={{ fontSize: 13, color: '#475569' }}>{v.visit_date ? new Date(v.visit_date).toLocaleString() : '-'} - {v.status || 'Planlagt'} {v.technician ? `(${v.technician})` : ''}</div>
-                      </div>
-                      <div><Button size="sm" onClick={() => window.location.hash = `visit:${v.id}`}>Åpne</Button></div>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13 }}>
+                      <input
+                        type="checkbox"
+                        checked={(() => {
+                          const planned = (data.visits||[]).filter(v => (v.status||'') === 'Planlagt')
+                          return planned.length > 0 && planned.every(v => selectedVisits.includes(v.id))
+                        })()}
+                        onChange={(e) => {
+                          const plannedIds = (data.visits||[]).filter(v => (v.status||'') === 'Planlagt').map(v => v.id)
+                          setSelectedVisits(e.target.checked ? plannedIds : [])
+                        }}
+                      />
+                      <span>Velg alle planlagte</span>
+                    </label>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={!selectedVisits.length}
+                      onClick={async () => {
+                        if (!selectedVisits.length) return;
+                        if (!window.confirm(`Slette ${selectedVisits.length} planlagte oppdrag?`)) return;
+                        try {
+                          const res = await VisitsAPI.batchDelete(selectedVisits)
+                          toast.push({ variant:'success', title:'Slettet', description:`Fjernet ${res.deleted_count} oppdrag${res.skipped_ids?.length ? `, hoppet over ${res.skipped_ids.length}`:''}.` })
+                          setSelectedVisits([])
+                          await load({ silent:true })
+                        } catch (e) {
+                          console.debug(e)
+                          toast.push({ variant:'error', title:'Feil', description:'Kunne ikke slette valgte oppdrag.' })
+                        }
+                      }}
+                    >Slett valgte</Button>
+                  </div>
+                  <ul className="list">
+                    {data.visits.map(v => (
+                      <li key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                          {(v.status||'') === 'Planlagt' ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedVisits.includes(v.id)}
+                              onChange={(e) => {
+                                setSelectedVisits(prev => e.target.checked ? Array.from(new Set([...prev, v.id])) : prev.filter(x => x !== v.id))
+                              }}
+                              aria-label="Velg besøk"
+                            />
+                          ) : <div style={{ width: 16 }} />}
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{v.title || 'Besøk'}</div>
+                            <div style={{ fontSize: 13, color: '#475569' }}>{v.visit_date ? new Date(v.visit_date).toLocaleString() : '-'} - {v.status || 'Planlagt'} {v.technician ? `(${v.technician})` : ''}</div>
+                          </div>
+                        </div>
+                        <div style={{ whiteSpace:'nowrap' }}>
+                          <Button size="sm" onClick={() => window.location.hash = `visit:${v.id}`}>Åpne</Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           </div>

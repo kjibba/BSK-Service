@@ -3,6 +3,7 @@ import { AuthProvider } from './components/auth.jsx';
 import { useAuth } from './components/hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast.jsx'
 import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
+import ErrorBoundary from './components/Boundary.jsx'
 
 // Lazy-load pages/components that are relatively heavy
 const CustomerList = lazy(() => import('./components/CustomerList.jsx'))
@@ -11,6 +12,7 @@ const MyMissions = lazy(() => import('./components/MyMissions.jsx'))
 const VisitDetail = lazy(() => import('./components/VisitDetail.jsx'))
 const EquipmentService = lazy(() => import('./components/EquipmentService.jsx'))
 const Employees = lazy(() => import('./components/Employees.jsx'))
+const EmployeeDetail = lazy(() => import('./components/EmployeeDetail.jsx'))
 const EquipmentTypesManager = lazy(() => import('./components/EquipmentTypesManager.jsx'))
 const CustomerDetail = lazy(() => import('./components/CustomerDetail.jsx'))
 const FeedbackAdmin = lazy(() => import('./components/FeedbackAdmin.jsx'))
@@ -54,6 +56,9 @@ function App() {
     return [Number(parts[1]), Number(parts[2])];
   }, [route]);
   const isEmployees = route === 'employees';
+  const isEmployeeNew = route === 'employee:new';
+  const isEmployee = !isEmployeeNew && route.startsWith('employee:');
+  const employeeId = isEmployee ? Number(route.split(':')[1]) : null;
   const isEquipTypes = route === 'equipment-types';
   const isFeedbackAdmin = route === 'feedback'
   const isCustomer = route.startsWith('customer:');
@@ -67,6 +72,7 @@ function App() {
   <SiteHeader route={route} />
   <Hero />
       <main id="main" ref={mainRef} tabIndex={-1} className="container" style={{padding:'2rem 1rem'}}>
+        <ErrorBoundary>
         <Suspense fallback={<p>Laster…</p>}>
           {isService ? (
             <EquipmentService visitId={serviceVisitId} equipmentId={serviceEquipmentId} />
@@ -78,6 +84,10 @@ function App() {
             <MyMissions />
           ) : isEmployees ? (
             <Employees />
+          ) : isEmployeeNew ? (
+            <EmployeeDetail id={'new'} />
+          ) : isEmployee ? (
+            <EmployeeDetail id={employeeId} />
           ) : isEquipTypes ? (
             <EquipmentTypesManager />
           ) : isFeedbackAdmin ? (
@@ -90,6 +100,7 @@ function App() {
             <CustomerList />
           )}
         </Suspense>
+        </ErrorBoundary>
       </main>
       {/* Mobile bottom tab bar */}
       <div className="bottom-tabbar">
@@ -110,6 +121,12 @@ export default App;
 
 function SiteHeader({ route }){
   const { user } = useAuth()
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('bsk:theme') || 'light' } catch { return 'light' }
+  })
+  useEffect(() => {
+    try { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('bsk:theme', theme) } catch(e) { console.debug(e) }
+  }, [theme])
   const isManager = user?.role === 'manager'
   const active = (r) => (route === r ? 'active' : '')
   return (
@@ -123,13 +140,17 @@ function SiteHeader({ route }){
         <nav className="nav mobile-hide">
           <a href="#customers" className={`nav-link ${active('customers')}`} aria-current={route==='customers' ? 'page' : undefined}>Kunder</a>
           <a href="#map" className={`nav-link ${active('map')}`} aria-current={route==='map' ? 'page' : undefined}>Kart</a>
-          <a href="#missions" className={`nav-link ${active('missions')}`} aria-current={route==='missions' ? 'page' : undefined}>Mine oppdrag</a>
+          <a href="#missions" className={`nav-link ${active('missions')}`} aria-current={route==='missions' ? 'page' : undefined}>Oppdrag</a>
           {isManager && <a href="#employees" className={`nav-link mobile-hide ${active('employees')}`} aria-current={route==='employees' ? 'page' : undefined}>Ansatte</a>}
-          {isManager && <a href="#equipment-types" className={`nav-link mobile-hide ${active('equipment-types')}`} aria-current={route==='equipment-types' ? 'page' : undefined}>Utstyrstyper</a>}
+          {/* Admin-visning fjernet; MyMissions viser alt for leder */}
+          {isManager && <a href="#equipment-types" className={`nav-link mobile-hide ${active('equipment-types')}`} aria-current={route==='equipment-types' ? 'page' : undefined}>Utstyr</a>}
           {isManager && <a href="#feedback" className={`nav-link mobile-hide ${active('feedback')}`} aria-current={route==='feedback' ? 'page' : undefined}>Feedback</a>}
         </nav>
-        {/* On mobile, only show login/user at top-right for cleanliness. Replace text with username when logged in. */}
-        <a href="#login" className="nav-link login-link">{user ? (user.name || user.email || 'Min profil') : 'Logg inn'}</a>
+           {/* actions (login + theme toggle) positioned to the right */}
+           <div className="header-actions" aria-hidden={false}>
+             <a href="#login" className="nav-link login-link">{user ? (user.name || user.email || 'Min profil') : 'Logg inn'}</a>
+             <button title={theme === 'dark' ? 'Bytt til lyst tema' : 'Bytt til mørkt tema'} className="theme-toggle-btn btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} aria-pressed={theme==='dark'} style={{padding:'6px 8px'}}>{theme === 'dark' ? '☀️' : '🌙'}</button>
+           </div>
       </div>
     </header>
   )

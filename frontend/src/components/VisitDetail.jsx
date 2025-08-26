@@ -296,6 +296,7 @@ function Inner({ visitId }){
   const v = data.visit
   const canStart = v.status === 'Planlagt' || !v.status
   const canComplete = v.status === 'Pågående'
+  const canDelete = v.status === 'Planlagt'
 
   const addLog = async (e) => {
     e.preventDefault()
@@ -392,6 +393,21 @@ function Inner({ visitId }){
           </div>
           <div style={{display:'flex', gap:8}}>
             {canStart && <Button variant="primary" onClick={start}>Start besøk</Button>}
+            {canDelete && (
+              <Button variant="danger" onClick={async () => {
+                try {
+                  if (!window.confirm('Slette dette oppdraget?')) return
+                  await VisitsAPI.delete(visitId)
+                  toast.push({ variant:'success', title:'Slettet', description:'Oppdraget ble slettet.' })
+                  // Naviger tilbake til kundekort om vi har det; ellers til missions
+                  const cid = data?.customer?.id
+                  window.location.hash = cid ? `customer:${cid}` : 'missions'
+                } catch (e) {
+                  const msg = e?.response?.data?.error || e?.message || 'Kunne ikke slette oppdrag'
+                  toast.push({ variant:'error', title:'Sletting feilet', description: String(msg) })
+                }
+              }}>Slett oppdrag</Button>
+            )}
             <Button onClick={() => window.history.back()}>Tilbake</Button>
           </div>
         </div>

@@ -13,8 +13,9 @@ sys.path.insert(0, str(ROOT))
 from backend.app import app
 from backend.extensions import db
 from backend.models import Employee
+from typing import Optional
 
-def promote(email: str, name: str|None = None):
+def promote(email: str, name: Optional[str] = None):
     with app.app_context():
         emp = Employee.query.filter(Employee.email == email).first()
         if not emp:

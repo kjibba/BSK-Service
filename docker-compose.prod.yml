@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.5
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bsk_service_db}
+      MYSQL_USER: ${MYSQL_USER:-bsk_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -P 3306 -u ${MYSQL_USER:-bsk_user} -p${MYSQL_PASSWORD:-change-me} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: bsk-backend:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - FLASK_APP=app.py
+      - PYTHONPATH=/app
+      - PORT=${PORT:-8000}
+    volumes:
+      - ./backend/static/uploads:/app/backend/static/uploads
+    ports:
+      - "18000:${PORT:-8000}"
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+volumes:
+  db-data:
+version: "3.8"
+
+# NOTE: If you edit these files locally, copy them to the NAS project folder
+# (e.g. /volume1/web/BSK_Service_App) before running docker-compose on the NAS.
+# Use the project's deploy script or robocopy/rsync to upload changes.
+
+services:
+  db:
+    version: "3.8"
+
+    # NOTE: If you edit these files locally, copy them to the NAS project folder
+    # (e.g. /volume1/web/BSK_Service_App) before running docker-compose on the NAS.
+    # Use the project's deploy script or robocopy/rsync to upload changes.
+
+    services:
+      db:
+        image: mariadb:10.5
+        restart: unless-stopped
+        environment:
+          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me}
+          MYSQL_DATABASE: ${MYSQL_DATABASE:-bsk_service_db}
+          MYSQL_USER: ${MYSQL_USER:-bsk_user}
+          MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+        volumes:
+          - db-data:/var/lib/mysql
+        healthcheck:
+          test: ["CMD-SHELL", "mysqladmin ping -h localhost -P 3306 -u ${MYSQL_USER:-bsk_user} -p${MYSQL_PASSWORD:-change-me} || exit 1"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+
+      backend:
+        build:
+          context: .
+          dockerfile: docker/backend.Dockerfile
+        image: bsk-backend:latest
+        restart: unless-stopped
+        depends_on:
+          db:
+            condition: service_healthy
+        env_file: .env
+        environment:
+          - DATABASE_URL=${DATABASE_URL}
+          - FLASK_APP=app.py
+          - PYTHONPATH=/app
+          - PORT=${PORT:-8000}
+        volumes:
+          - ./backend/static/uploads:/app/backend/static/uploads
+        ports:
+          - "18000:${PORT:-8000}"
+
+      adminer:
+        image: adminer
+        restart: unless-stopped
+        ports:
+          - "8080:8080"
+
+    volumes:
+      db-data:

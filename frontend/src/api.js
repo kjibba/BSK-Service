@@ -34,7 +34,10 @@ export const VisitsAPI = {
   },
   complete: (id, payload) => api.post(`/visits/${id}/complete`, payload).then(r => r.data),
   assign: (id, technicianId) => api.post(`/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
+  batchDelete: (ids) => api.post('/visits/batch_delete', { ids }).then(r => r.data),
+  delete: (id) => api.delete(`/visits/${id}`).then(r => r.data),
   office: {
+  list: (params) => api.get('/office/visits', { params }).then(r => r.data),
     create: (payload) => api.post('/office/visits', payload).then(r => r.data),
     assign: (id, technicianId) => api.post(`/office/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
   }
@@ -58,7 +61,11 @@ export const AuthAPI = {
 
 export const EmployeesAPI = {
   list: () => api.get('/employees').then(r => r.data),
+  detail: (id) => api.get(`/employees/${id}`).then(r => r.data),
+  create: (payload) => api.post('/employees', payload).then(r => r.data),
   update: (id, payload) => api.put(`/employees/${id}`, payload).then(r => r.data),
+  delete: (id) => api.delete(`/employees/${id}`).then(r => r.data),
+  stats: (id) => api.get(`/employees/${id}/stats`).then(r => r.data),
 }
 
 export const EquipmentTypesAPI = {

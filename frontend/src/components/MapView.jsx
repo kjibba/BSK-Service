@@ -5,12 +5,22 @@ import L from 'leaflet';
 import 'leaflet.gridlayer.googlemutant';
 
 // Simple colored marker icons using Leaflet DivIcon
-const makeIcon = (color) => L.divIcon({
-  className: 'status-marker',
-  html: `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #0f172a;box-shadow:0 0 0 2px rgba(255,255,255,0.7);"></span>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
+const makeIcon = (color) => {
+  try {
+    return L.divIcon({
+      className: 'leaflet-div-icon status-marker',
+      // thin white ring around colored dot; keep it minimal to avoid layout issues
+      html: `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${color};box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></span>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    })
+  } catch (e) {
+    // Fallback without ring if something about style/html crashes in this environment
+    // eslint-disable-next-line no-console
+    console.error('makeIcon failed, falling back without ring:', e)
+    return L.divIcon({ className: 'leaflet-div-icon status-marker', html: `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${color};"></span>`, iconSize: [18,18], iconAnchor:[9,9] })
+  }
+}
 
 const greenIcon = makeIcon('#16a34a');
 const yellowIcon = makeIcon('#f59e0b');
@@ -126,12 +136,22 @@ export default function MapView() {
     if (!group || !map) return;
     group.clearLayers();
     customers.forEach(c => {
-      const status = statusFor(c.next_visit_date);
+      // Prefer backend-provided status; fallback to client-side calc from next_visit_date
+      const status = (c && c.status) ? c.status : statusFor(c.next_visit_date);
       const icon = status === 'green' ? greenIcon : status === 'yellow' ? yellowIcon : redIcon;
-      const m = L.marker([c.latitude, c.longitude], { icon });
+      let m
+      try {
+        m = L.marker([c.latitude, c.longitude], { icon })
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Marker creation failed for customer', c?.id, err)
+        return
+      }
       const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
-        const html = `<div style="min-width:240px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px">Neste service: ${nextText}</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="btn-open" href="#customer:${c.id}">Åpne kundekort</a><button type="button" class="btn-new-visit" data-id="${c.id}" style="padding:4px 8px;font-size:12px">+ Nytt oppdrag</button></div><div class="new-visit-form" style="display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px"><label style="display:block;margin-bottom:6px;font-size:12px">Dato og tid<input type="datetime-local" class="nv-date" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><label style="display:block;margin-bottom:6px;font-size:12px">Tekniker<select class="nv-tech" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">(ingen)</option></select></label><label style="display:block;margin-bottom:6px;font-size:12px">Notat<input class="nv-notes" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="nv-cancel" style="padding:4px 8px;font-size:12px">Avbryt</button><button type="button" class="nv-save" style="padding:4px 8px;font-size:12px">Opprett</button></div></div></div>`;
-      m.bindPopup(html);
+    const expectedText = c.expected_service_date ? new Date(c.expected_service_date).toLocaleString() : 'Ukjent';
+    const plannedText = c.planned_next_visit_date ? new Date(c.planned_next_visit_date).toLocaleString() : 'Ikke planlagt';
+    const html = `<div style="min-width:260px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px"><div><strong>Forventet service:</strong> ${expectedText}</div><div style="margin-top:4px"><span style="color:#475569">Planlagt besøk:</span> ${plannedText}</div></div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="btn-open" href="#customer:${c.id}">Åpne kundekort</a><button type="button" class="btn-new-visit" data-id="${c.id}" style="padding:4px 8px;font-size:12px">+ Nytt oppdrag</button></div><div class="new-visit-form" style="display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px"><label style="display:block;margin-bottom:6px;font-size:12px">Dato og tid<input type="datetime-local" class="nv-date" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><label style="display:block;margin-bottom:6px;font-size:12px">Tekniker<select class="nv-tech" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">(ingen)</option></select></label><label style="display:block;margin-bottom:6px;font-size:12px">Notat<input class="nv-notes" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="nv-cancel" style="padding:4px 8px;font-size:12px">Avbryt</button><button type="button" class="nv-save" style="padding:4px 8px;font-size:12px">Opprett</button></div></div></div>`;
+  try { m.bindPopup(html) } catch (err) { console.error('bindPopup failed', err) }
         m.on('popupopen', async (ev) => {
           const root = ev.popup.getElement();
           const btn = root.querySelector('.btn-new-visit');
@@ -233,8 +253,7 @@ export default function MapView() {
           >Google Kart</button>
         </div>
       )}
-      <div className="map-legend">
-        <strong>Fargekoder:</strong>
+  <div className="map-legend">
         <div><span className="dot" style={{background:'#16a34a'}}></span>OK</div>
         <div><span className="dot" style={{background:'#f59e0b'}}></span>Neste service ≤ 30 dager</div>
         <div><span className="dot" style={{background:'#dc2626'}}></span>Forbi frist / mangler plan</div>

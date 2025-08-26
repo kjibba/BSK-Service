@@ -9,7 +9,7 @@ export function Empty({ children = 'Ingen data å vise.' }){
 export function ErrorState({ message = 'En feil oppstod', onRetry }){
   return (
     <div className="card" style={{maxWidth:600, borderColor:'#fecaca'}}>
-      <h3 style={{marginTop:0}}>Noe gikk galt</h3>
+        <h2 style={{marginTop:0}}>Noe gikk galt</h2>
       <p style={{color:'#b91c1c'}}>{message}</p>
       {onRetry && <button className="btn" onClick={onRetry}>Prøv igjen</button>}
     </div>
