@@ -51,6 +51,7 @@ Gi beskjed hvis noe er uklart eller mangler (f.eks. mer om auth, datoformat, ell
 9) Pedagogiske hensyn og oppdatert info
 - Bruker er norsk. Bruk norsk språk.
 - Forklar endringer kort og enkelt i PR-beskrivelser/commits: hva, hvorfor, hvor i koden, hvordan teste.
+- Husk at bruker er nybegynner og trenger mye veiledning.
 - Unngå fagsjargong; legg inn små, relevante kommentarer i ny kode (kun der det hjelper).
 - Når du er i tvil, hent siste dokumentasjon online (offisielle kilder først) og lenk kort i PR:
 	- TypeORM (v0.3+), Express, React, Vite, Leaflet, mysql2.

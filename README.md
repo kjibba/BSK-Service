@@ -42,10 +42,33 @@ copy .env.example .env  # sett passord/porter
 docker compose up -d --build
 ```
 
-- Nginx eksponerer porter `${NGINX_HTTP_PORT}`/`${NGINX_HTTPS_PORT}`
-- Backend er kun internt tilgjengelig bak Nginx
-- Opplastede bilder serviceres fra `/static/uploads`
 
+## Deployment
+
+See docs/WORKFLOWS.md
+
+### Hetzner (Docker)
+
+Prereqs: fresh Ubuntu/Debian host. Script will install Docker + compose.
+
+Steps on server:
+
+1) Run the one-shot deploy script (customize env as needed):
+
+	curl -fsSL https://raw.githubusercontent.com/kjibba/BSK-Service/feature/visit-workflow/scripts/deploy_hetzner.sh -o deploy.sh && \
+	chmod +x deploy.sh && \
+	sudo HTTP_PORT=80 HTTPS_PORT=443 BRANCH=feature/visit-workflow ./deploy.sh
+
+2) Update `.env` in `/opt/bsk-service` with real secrets and re-run:
+
+	cd /opt/bsk-service
+	docker compose up -d --build
+	docker compose run --rm backend node dist/run-migrations.js
+
+Services:
+- Nginx: :80 (and 443 if configured)
+- Backend: internal :8000 (proxied by Nginx)
+- DB: internal MariaDB (volume `db_data`)
 ## Legacy (arkiv)
 
 Mappen `backend/` inneholder en eldre Flask-implementasjon. Den er bevart kun som referanse og vil fjernes i en senere opprydding. Ikke gjør endringer der.

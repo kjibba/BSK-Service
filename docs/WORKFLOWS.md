@@ -60,3 +60,13 @@ We can design and iterate features by writing down the real-world workflows and 
 2. Label it with a short ID (WF-###) for tracking.
 3. We’ll implement from top to bottom: data -> API -> UI.
 4. Each merged change should reference the workflow ID in commit messages.
+
+## Produksjon / Docker
+
+- Start/bygg: `docker compose up -d --build`
+- Kjør migrasjoner (Node backend): `docker compose run --rm backend node dist/run-migrations.js`
+- Helse: `curl http://localhost/health`
+
+### Hetzner
+
+Se `scripts/deploy_hetzner.sh` for full automatisert oppsett på en ny server. Oppdater `.env` på serveren etter første kjøring.

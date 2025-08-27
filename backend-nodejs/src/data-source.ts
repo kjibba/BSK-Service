@@ -19,6 +19,8 @@ const DB_PORT = parseInt(process.env.DB_PORT || "3306");
 const DB_USERNAME = process.env.DB_USERNAME || "bsk_user";
 const DB_PASSWORD = process.env.DB_PASSWORD || "et_sikkert_passord";
 const DB_DATABASE = process.env.DB_DATABASE || "bsk_service_db";
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const DB_SYNC = (process.env.DB_SYNC || '').toLowerCase() === 'true';
 
 export const AppDataSource = new DataSource({
   type: "mysql",
@@ -27,8 +29,9 @@ export const AppDataSource = new DataSource({
   username: DB_USERNAME,
   password: DB_PASSWORD,
   database: DB_DATABASE,
-  synchronize: false, // Use migrations in production
-  logging: process.env.NODE_ENV !== "production",
+  // In production: always false. Locally, you can set DB_SYNC=true in .env to auto-create tables.
+  synchronize: NODE_ENV === 'production' ? false : (DB_SYNC || true),
+  logging: NODE_ENV !== "production",
   entities: [
     Customer,
     Visit,
@@ -44,6 +47,6 @@ export const AppDataSource = new DataSource({
     DailyTask,
   ServiceReport,
   ],
-  migrations: ["src/migrations/*.ts"],
+  migrations: [process.env.NODE_ENV === 'production' ? "dist/migrations/*.js" : "src/migrations/*.ts"],
   subscribers: [],
 });

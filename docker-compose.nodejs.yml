@@ -1,56 +1,10 @@
 version: '3.8'
 
+# DEPRECATED: Ikke bruk denne filen i produksjon.
+# Bruk docker-compose.yml.
+
 services:
-  db:
-    image: mariadb:10.6
-    container_name: bsk_nodejs_db
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-bsk_service}
-      MYSQL_USER: ${MYSQL_USER:-bsk_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bskpassword}
-    ports:
-      - "3307:3306"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    networks:
-      - bsk_network
-
-  backend:
-    build: 
-      context: ./backend-nodejs
-      dockerfile: Dockerfile
-    container_name: bsk_nodejs_backend
-    environment:
-      NODE_ENV: production
-      PORT: 8000
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_USERNAME: ${MYSQL_USER:-bsk_user}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-bskpassword}
-      DB_NAME: ${MYSQL_DATABASE:-bsk_service}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    networks:
-      - bsk_network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/frontend.Dockerfile
-    container_name: bsk_nodejs_frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    networks:
-      - bsk_network
-
-volumes:
-  mariadb_data:
-
-networks:
-  bsk_network:
-    driver: bridge
+  _deprecated:
+    image: hello-world
+    deploy:
+      replicas: 0

@@ -1,0 +1,35 @@
+# Global dockerignore used when building nginx image from repo root
+
+# VCS and editors
+.git
+.gitignore
+.vscode
+.idea
+
+# Python legacy backend (not used in docker build)
+backend/
+migrations/
+requirements.txt
+
+# Node backend is built in its own context
+backend-nodejs/
+
+# Local envs and caches
+.venv/
+venv*/
+node_modules/
+**/node_modules/
+
+# Data and artifacts
+data/
+tmp*
+**/*.log
+**/.DS_Store
+
+# CI/Docs/Scripts (not needed inside nginx image)
+docs/
+scripts/
+docker/
+
+# Keep nginx/ssl if present (copied explicitly by Dockerfile)
+!nginx/ssl/
