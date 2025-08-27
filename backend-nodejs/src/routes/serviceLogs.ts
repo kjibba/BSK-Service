@@ -3,40 +3,53 @@ import { AppDataSource } from "../data-source";
 import { ServiceLog } from "../entities/ServiceLog";
 import { Equipment } from "../entities/Equipment";
 import { Visit } from "../entities/Visit";
+import { MaterialUsage } from "../entities/MaterialUsage";
+import { Material } from "../entities/Material";
 
 const router = express.Router();
 
 // GET /api/service-logs
 router.get("/", async (req, res) => {
   try {
-    const serviceLogRepository = AppDataSource.getRepository(ServiceLog);
-    const { equipment_id, visit_id } = req.query;
+    const repo = AppDataSource.getRepository(ServiceLog);
+    const { equipment_id, visit_id, customer_id } = req.query as any;
 
-    let whereClause: any = {};
-    
+    let qb = repo
+      .createQueryBuilder("log")
+      .leftJoinAndSelect("log.visit", "visit")
+      .leftJoinAndSelect("log.equipmentItem", "equipmentItem")
+      .leftJoinAndSelect("log.materialsUsed", "materialsUsed")
+      .leftJoinAndSelect("materialsUsed.material", "material");
+
     if (equipment_id !== undefined) {
-      const eid = parseInt(equipment_id as string, 10);
+      const eid = Number(equipment_id);
       if (!Number.isInteger(eid)) {
         return res.status(400).json({ error: "equipment_id must be an integer" });
       }
-      whereClause.equipmentId = eid;
+      qb = qb.andWhere("log.equipmentId = :eid", { eid });
     }
 
     if (visit_id !== undefined) {
-      const vid = parseInt(visit_id as string, 10);
+      const vid = Number(visit_id);
       if (!Number.isInteger(vid)) {
         return res.status(400).json({ error: "visit_id must be an integer" });
       }
-      whereClause.visitId = vid;
+      qb = qb.andWhere("log.visitId = :vid", { vid });
     }
 
-    const serviceLogs = await serviceLogRepository.find({
-      where: whereClause,
-      relations: ["visit", "equipmentItem", "materialsUsed", "materialsUsed.material"],
-      order: { logDate: "DESC" }
-    });
+    if (customer_id !== undefined) {
+      const cid = Number(customer_id);
+      if (!Number.isInteger(cid)) {
+        return res.status(400).json({ error: "customer_id must be an integer" });
+      }
+      qb = qb.andWhere("visit.customerId = :cid", { cid });
+    }
 
-    res.json(serviceLogs.map(log => log.toDict()));
+    // Emulate NULLS LAST: first non-NULL (false) then NULL (true), then date desc
+    qb = qb.orderBy("log.logDate IS NULL", "ASC").addOrderBy("log.logDate", "DESC");
+
+    const serviceLogs = await qb.getMany();
+    res.json(serviceLogs.map((log) => log.toDict()));
   } catch (error) {
     console.error("Error fetching service logs:", error);
     res.status(500).json({ error: "Failed to fetch service logs" });
@@ -134,6 +147,7 @@ router.put("/:id", async (req, res) => {
     }
 
     const serviceLogRepository = AppDataSource.getRepository(ServiceLog);
+    const materialUsageRepository = AppDataSource.getRepository(MaterialUsage);
     const serviceLog = await serviceLogRepository.findOne({
       where: { id }
     });
@@ -142,11 +156,55 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Service log not found" });
     }
 
-    const { log_date, description, hours_worked } = req.body;
+    const { log_date, description, hours_worked, materials_used, poison_bait, nonpoison_bait } = req.body || {};
 
     if (log_date !== undefined) serviceLog.logDate = new Date(log_date);
     if (description !== undefined) serviceLog.description = description;
     if (hours_worked !== undefined) serviceLog.hoursWorked = hours_worked;
+
+    // If any materials payload provided, replace existing usages
+    const hasMaterialsPayload = Array.isArray(materials_used) || (poison_bait && typeof poison_bait === "object") || (nonpoison_bait && typeof nonpoison_bait === "object");
+    if (hasMaterialsPayload) {
+      // delete existing
+      await materialUsageRepository.delete({ serviceLogId: serviceLog.id });
+
+      const addUsage = async (material_id: any, amount: any) => {
+        try {
+          if (material_id === undefined || material_id === null) return;
+          const mid = Number(material_id);
+          if (!Number.isInteger(mid)) return;
+          const mu = new MaterialUsage();
+          mu.serviceLogId = serviceLog.id;
+          mu.materialId = mid;
+          if (amount !== undefined && amount !== null && amount !== "") {
+            const amt = Number(amount);
+            if (!Number.isNaN(amt)) mu.amount = amt;
+          }
+          await materialUsageRepository.save(mu);
+        } catch {}
+      };
+
+      if (Array.isArray(materials_used)) {
+        for (const it of materials_used) {
+          await addUsage(it?.material_id, it?.amount);
+        }
+      }
+      const get = (obj: any, ...keys: string[]) => {
+        if (!obj || typeof obj !== "object") return undefined;
+        for (const k of keys) if (k in obj) return obj[k];
+        return undefined;
+      };
+      const pbMat = get(poison_bait, "used_material_id", "benyttet_giftaate_id", "benyttet_giftåte_id");
+      const pbAmt = get(poison_bait, "refilled_grams", "giftaate_etterfylt", "giftåte_etterfylt");
+      if (pbMat !== undefined || pbAmt !== undefined) {
+        await addUsage(pbMat, pbAmt);
+      }
+      const npMat = get(nonpoison_bait, "used_material_id", "benyttet_giftfritt_aate_id", "benyttet_giftfritt_åte_id");
+      const npAmt = get(nonpoison_bait, "refilled_grams", "giftfritt_etterfylt");
+      if (npMat !== undefined || npAmt !== undefined) {
+        await addUsage(npMat, npAmt);
+      }
+    }
 
     await serviceLogRepository.save(serviceLog);
 

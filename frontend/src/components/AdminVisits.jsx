@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { VisitsAPI } from '../api'
+import { VisitsAPI, EmployeesAPI } from '../api'
 import Button from './ui/Button'
 import { Loading, Empty, ErrorState } from './ui/States'
 import { RequireAuth } from './auth'
+import { useAuth } from './hooks/useAuth'
 
 export default function AdminVisits(){
   return (
@@ -13,11 +14,14 @@ export default function AdminVisits(){
 }
 
 function Inner(){
+  const { user } = useAuth()
+  const isAdmin = (user?.role === 'admin' || user?.role === 'manager')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState([])
   const [statusFilter, setStatusFilter] = useState('Planlagt')
+  const [emps, setEmps] = useState([])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -28,7 +32,17 @@ function Inner(){
       setError(e?.message || 'Kunne ikke hente oppdrag')
     } finally { setLoading(false) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (isAdmin) load() }, [isAdmin])
+  useEffect(() => { if (isAdmin) { EmployeesAPI.list().then(setEmps).catch(()=> setEmps([])) } }, [isAdmin])
+
+  if (!isAdmin) {
+    return (
+      <div style={{padding:'1rem'}}>
+        <h2>Oppdrag (admin)</h2>
+        <p style={{color:'#475569'}}>Denne visningen krever rolle admin eller manager.</p>
+      </div>
+    )
+  }
 
   const filtered = useMemo(() => {
     if (!statusFilter) return items
@@ -86,6 +100,22 @@ function Inner(){
                 <div>
                   <div style={{fontWeight:600}}>{v.customer?.name || 'Kunde'} — {v.technician || v.assigned_technician_id ? `(${v.technician || ('Tekniker #' + v.assigned_technician_id)})` : ''}</div>
                   <div style={{fontSize:12, color:'#475569'}}>{v.visit_date ? new Date(v.visit_date).toLocaleString() : '-'} — {v.status || 'Planlagt'}</div>
+                  {isAdmin && (
+                    <div style={{marginTop:6}}>
+                      <label style={{fontSize:12, color:'#475569', marginRight:6}}>Tildel:</label>
+                      <select
+                        className="input"
+                        value={v.assigned_technician_id || ''}
+                        onChange={async (e)=> { const tid = e.target.value; if (!tid) return; await VisitsAPI.assign(v.id, Number(tid)); await load() }}
+                        style={{maxWidth:260}}
+                      >
+                        <option value="">Velg tekniker…</option>
+                        {emps.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name || emp.email}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{whiteSpace:'nowrap',display:'flex',gap:8}}>

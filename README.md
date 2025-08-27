@@ -1,112 +1,55 @@
 # BSK Service App
 
-Internal service tool for Bergen Skadedyrkontroll: customers, equipment, visits and service logs.
+Internverktøy for Bergen Skadedyrkontroll: kunder, utstyr, besøk og servicelogger.
 
-This repository contains a Flask backend (API + migrations) and a React frontend (Vite). The project is configured for local development with a Python virtual environment and a Node dev server.
+Aktiv backend er Node.js/Express/TypeORM i `backend-nodejs/`. Frontend er React/Vite i `frontend/`.
+Den gamle Flask-backenden i `backend/` er arkivert for referanse og brukes ikke i drift.
 
-## Quick start (development)
+## Hurtigstart (utvikling)
 
-Prerequisites
-- Python 3.11+ and pip
-- Node.js 18+ and npm
-- MySQL/MariaDB (local or remote) and a database created for the app
+Forutsetninger
+- Node.js 18+ og npm
+- MariaDB/MySQL tilgjengelig og database opprettet
 
-1) Backend: create and activate a virtual environment
-
-```powershell
-cd F:\dev\BSK_Service_App
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt  # if you have one, else install Flask, SQLAlchemy, Alembic, PyMySQL, flask-login, flask-migrate, flask-cors
-```
-
-2) Configure database
-- Edit `backend/app.py` or set environment variables so `SQLALCHEMY_DATABASE_URI` points to your DB. Example:
-
-```
-mysql+pymysql://bsk_user:password@localhost/bsk_service_db
-```
-
-3) Apply migrations
+1) Backend (Node)
 
 ```powershell
-cd F:\dev\BSK_Service_App
-.\.venv\Scripts\activate
-# Ensure FLASK_APP is set if needed, then
-flask db upgrade
+cd F:\dev\BSK_Service_App\backend-nodejs
+npm install
+copy .env.example .env  # juster verdier ved behov
+npm run dev
+# Lytter på http://localhost:8000
 ```
 
-4) Run backend
-
-```powershell
-cd F:\dev\BSK_Service_App
-.\.venv\Scripts\activate
-python -m backend.app
-# Backend runs on http://0.0.0.0:5000 by default
-```
-
-5) Frontend (dev)
+2) Frontend (Vite)
 
 ```powershell
 cd F:\dev\BSK_Service_App\frontend
 npm install
-npm run dev -- --host
-# Vite will serve on http://localhost:5173 (or try another port if in use)
+npm run dev
+# Vite på http://localhost:5175 (proxy til backend på /api)
 ```
 
-Open the frontend URL in your browser (Vite output shows the exact port). The frontend proxies `/api` to the backend during development.
+Åpne frontend-URL i nettleser. `/api` proxes til backend.
 
-## Run backend in Docker (NAS-friendly)
-If you want the backend to run on a NAS (e.g., Synology) or any always-on host with Docker:
+## Docker Compose (NAS/produksjon)
 
-1) Build and run with docker-compose
-	- Ensure Docker is installed on the host.
-	- Set DATABASE_URL in the environment (shell or .env next to docker-compose.yml).
+Bruk `docker-compose.yml` for Nginx (SPA + reverse proxy), Node-backend og MariaDB.
 
 ```powershell
-# On the host where Docker is installed
 cd F:\dev\BSK_Service_App
-$env:DATABASE_URL = 'postgresql://user:password@dbhost:5432/dbname'
+copy .env.example .env  # sett passord/porter
 docker compose up -d --build
 ```
 
-2) What it does
-	- Builds an image from `docker/backend.Dockerfile`.
-	- Runs Alembic migrations at container start, then serves with Waitress on port 8000.
-	- Persists uploads via bind mount: `./backend/static/uploads`.
+- Nginx eksponerer porter `${NGINX_HTTP_PORT}`/`${NGINX_HTTPS_PORT}`
+- Backend er kun internt tilgjengelig bak Nginx
+- Opplastede bilder serviceres fra `/static/uploads`
 
-3) Access
-	- Backend: http://HOST_IP:8000
+## Legacy (arkiv)
 
-Troubleshooting
-- Ensure the DB is reachable from the NAS host.
-- If migrations fail, check container logs: `docker compose logs -f backend`.
-- Verify `DATABASE_URL` is correct (username/password/host/port/dbname).
+Mappen `backend/` inneholder en eldre Flask-implementasjon. Den er bevart kun som referanse og vil fjernes i en senere opprydding. Ikke gjør endringer der.
 
-## Useful scripts
-- `backend/scripts/promote_manager.py <email> [name]` — create or promote an employee to role `manager`.
-- `backend/scripts/count_employees.py` — prints employees from the DB (debugging)
+## Copilot-instruksjoner
 
-## Auth and sessions
-- The app uses a simple email-based login (no password) for local/dev convenience. Use the login UI in the frontend.
-- In production you should replace this with a proper auth/SSO and secure cookies.
-
-## Notes & troubleshooting
-- If the frontend can't talk to the backend, verify CORS origins in `backend/app.py` and the Vite port (5173/5174).
-- If you see `TypeError: _Loader() takes no arguments` or other Flask-Login errors, restart the backend — the codebase includes a working `user_loader` implementation.
-- If employees list is empty, ensure you are logged in and your session cookies are accepted for `localhost:5173` and `localhost:5000`.
-
-## Git
-- Repo initialized locally; push branches and create Pull Requests on GitHub. Avoid committing secrets (add them to .gitignore).
-
-## License
-This project is internal; add a license file if you will publish.
-
----
-## Copilot instructions
-This repository contains a canonical Copilot instruction file with project-specific rules and guidelines for automated agents.
-Please read `.github/copilot-instructions.md` before requesting code changes or automated edits.
-
-The file explains coding style, where to place new code, migration workflow, PowerShell examples and other helpful conventions.
-
-If you want, I can also create a minimal `requirements.txt` and a `README` section tailored to production deployment.
+Se `.github/copilot-instructions.md` for prosjektspesifikke retningslinjer (mappestruktur, API-konvensjoner, datoformat, PowerShell-eksempler, m.m.).

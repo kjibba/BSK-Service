@@ -7,6 +7,35 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+// Global response error interceptor → emit a browser event the UI can toast
+api.interceptors.response.use(
+  (resp) => resp,
+  (error) => {
+    try {
+      const status = error?.response?.status
+      const url = error?.config?.url || 'ukjent'
+      const detailMsg = error?.response?.data?.message || error?.message || 'Ukjent feil'
+      // Only toast on real HTTP errors (not cancellations)
+      if (!axios.isCancel(error)) {
+        const variant = status >= 500 ? 'danger' : status >= 400 ? 'warning' : 'default'
+        const title = status ? `Feil ${status}` : 'Feil'
+        const description = `${title} ved ${url}: ${detailMsg}`
+        window.dispatchEvent(new CustomEvent('app:toast', { detail: { variant, title, description, timeout: 5000 } }))
+      }
+    } catch (_) { /* no-op */ }
+    return Promise.reject(error)
+  }
+)
+
+// JWT helper: set or clear Authorization header globally
+export function setAuthToken(token) {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  } else {
+    delete api.defaults.headers.common['Authorization']
+  }
+}
+
 export const CustomersAPI = {
   list: (params) => api.get('/customers', { params }).then(r => r.data),
   create: (payload) => api.post('/customers', payload).then(r => r.data),
@@ -20,6 +49,9 @@ export const EquipmentAPI = {
   create: (payload) => api.post('/equipment', payload).then(r => r.data),
   update: (id, payload) => api.put(`/equipment/${id}`, payload).then(r => r.data),
   delete: (id) => api.delete(`/equipment/${id}`).then(r => r.data),
+  assignNearest: (id, opts) => api.post(`/equipment/${id}/assign_nearest`, opts || {}).then(r => r.data),
+  assignNearestBatch: (opts) => api.post('/equipment/assign_nearest/batch', opts || {}).then(r => r.data),
+  assignToCustomerByCoords: (targetCustomerId, opts) => api.post('/equipment/assign_to_customer_by_coords', { target_customer_id: targetCustomerId, ...(opts||{}) }).then(r => r.data),
 }
 
 export const VisitsAPI = {
@@ -41,6 +73,12 @@ export const VisitsAPI = {
     create: (payload) => api.post('/office/visits', payload).then(r => r.data),
     assign: (id, technicianId) => api.post(`/office/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
   }
+}
+
+export const RouteChoicesAPI = {
+  add: (customerId, selectedDate) => api.post('/route-choices', { customer_id: customerId, selected_date: selectedDate }).then(r => r.data),
+  myToday: () => api.get('/route-choices/my_today').then(r => r.data),
+  remove: (id) => api.delete(`/route-choices/${id}`).then(r => r.data),
 }
 
 export const ServiceLogsAPI = {
@@ -84,4 +122,9 @@ export const FeedbackAPI = {
   list: (tail) => api.get('/feedback', { params: { tail } }).then(r => r.data),
   detail: (id) => api.get(`/feedback/${id}`).then(r => r.data),
   update: (id, payload) => api.put(`/feedback/${id}`, payload).then(r => r.data),
+}
+
+export const ReportsAPI = {
+  listAll: () => api.get('/reports').then(r => r.data),
+  byCustomer: (id) => api.get(`/reports/by_customer/${id}`).then(r => r.data),
 }

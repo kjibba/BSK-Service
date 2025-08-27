@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapAPI, VisitsAPI, EmployeesAPI } from '../api';
+import { MapAPI, VisitsAPI, EmployeesAPI, RouteChoicesAPI } from '../api';
+import { useAuth } from './hooks/useAuth';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet.gridlayer.googlemutant';
@@ -37,6 +38,8 @@ const statusFor = (nextVisitIso) => {
 };
 
 export default function MapView() {
+  const { user } = useAuth();
+  const isAdmin = (user?.role === 'admin' || user?.role === 'manager');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -150,18 +153,33 @@ export default function MapView() {
       const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
     const expectedText = c.expected_service_date ? new Date(c.expected_service_date).toLocaleString() : 'Ukjent';
     const plannedText = c.planned_next_visit_date ? new Date(c.planned_next_visit_date).toLocaleString() : 'Ikke planlagt';
-    const html = `<div style="min-width:260px"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style="margin-top:8px"><div><strong>Forventet service:</strong> ${expectedText}</div><div style="margin-top:4px"><span style="color:#475569">Planlagt besøk:</span> ${plannedText}</div></div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><a class="btn-open" href="#customer:${c.id}">Åpne kundekort</a><button type="button" class="btn-new-visit" data-id="${c.id}" style="padding:4px 8px;font-size:12px">+ Nytt oppdrag</button></div><div class="new-visit-form" style="display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px"><label style="display:block;margin-bottom:6px;font-size:12px">Dato og tid<input type="datetime-local" class="nv-date" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><label style="display:block;margin-bottom:6px;font-size:12px">Tekniker<select class="nv-tech" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">(ingen)</option></select></label><label style="display:block;margin-bottom:6px;font-size:12px">Notat<input class="nv-notes" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label><div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="nv-cancel" style="padding:4px 8px;font-size:12px">Avbryt</button><button type="button" class="nv-save" style="padding:4px 8px;font-size:12px">Opprett</button></div></div></div>`;
+  const routeBtn = `<button type=\"button\" class=\"btn-add-route\" data-id=\"${c.id}\" style=\"padding:4px 8px;font-size:12px\">+ Legg til i Dagsrute</button>`;
+  const newBtn = isAdmin ? `<button type=\"button\" class=\"btn-new-visit\" data-id=\"${c.id}\" style=\"padding:4px 8px;font-size:12px\">+ Nytt oppdrag</button>` : '';
+  const formHtml = isAdmin ? `<div class=\"new-visit-form\" style=\"display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px\"><label style=\"display:block;margin-bottom:6px;font-size:12px\">Dato og tid<input type=\"datetime-local\" class=\"nv-date\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\" /></label><label style=\"display:block;margin-bottom:6px;font-size:12px\">Tekniker<select class=\"nv-tech\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\"><option value=\"\">(ingen)</option></select></label><label style=\"display:block;margin-bottom:6px;font-size:12px\">Notat<input class=\"nv-notes\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\" /></label><div style=\"display:flex;gap:6px;justify-content:flex-end\"><button type=\"button\" class=\"nv-cancel\" style=\"padding:4px 8px;font-size:12px\">Avbryt</button><button type=\"button\" class=\"nv-save\" style=\"padding:4px 8px;font-size:12px\">Opprett</button></div></div>` : '';
+  const html = `<div style=\"min-width:260px\"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style=\"margin-top:8px\"><div><strong>Forventet service:</strong> ${expectedText}</div><div style=\"margin-top:4px\"><span style=\"color:#475569\">Planlagt besøk:</span> ${plannedText}</div></div><div style=\"margin-top:8px;display:flex;gap:6px;flex-wrap:wrap\"><a class=\"btn-open\" href=\"#customer:${c.id}\">Åpne kundekort</a>${routeBtn}${newBtn}</div>${formHtml}</div>`;
   try { m.bindPopup(html) } catch (err) { console.error('bindPopup failed', err) }
         m.on('popupopen', async (ev) => {
           const root = ev.popup.getElement();
           const btn = root.querySelector('.btn-new-visit');
+          const addRouteBtn = root.querySelector('.btn-add-route');
+          if (addRouteBtn) {
+            addRouteBtn.addEventListener('click', async (e) => {
+              e.preventDefault(); e.stopPropagation();
+              try {
+                await RouteChoicesAPI.add(c.id)
+                alert('Lagt til i dagsruten')
+              } catch (_) {
+                alert('Kunne ikke legge til i dagsruten')
+              }
+            }, { once: true })
+          }
           const formBox = root.querySelector('.new-visit-form');
           const techSel = root.querySelector('.nv-tech');
           const cancelBtn = root.querySelector('.nv-cancel');
           const saveBtn = root.querySelector('.nv-save');
           const dateInput = root.querySelector('.nv-date');
           const notesInput = root.querySelector('.nv-notes');
-          if (btn && formBox) {
+          if (isAdmin && btn && formBox) {
             btn.addEventListener('click', async (e) => {
               e.preventDefault(); e.stopPropagation();
               try { formBox.style.display = 'block'; } catch {}
@@ -179,10 +197,10 @@ export default function MapView() {
               } catch {}
             }, { once: true });
           }
-          if (cancelBtn && formBox) {
+          if (isAdmin && cancelBtn && formBox) {
             cancelBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); try { formBox.style.display = 'none'; } catch {} }, { once: true });
           }
-          if (saveBtn) {
+          if (isAdmin && saveBtn) {
             saveBtn.addEventListener('click', async (e2) => {
               e2.preventDefault(); e2.stopPropagation();
               try {

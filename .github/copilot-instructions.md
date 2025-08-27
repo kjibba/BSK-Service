@@ -1,6 +1,6 @@
 ## Copilot-instruksjoner for BSK Service App (kort, praktisk)
 
-Denne repoen har React/Vite frontend og en ny Node.js/Express/TypeORM backend (folder `backend-nodejs`). En eldre Flask-backend ligger fortsatt i `backend/` for referanse, men aktiv utvikling skjer på Node.
+Denne repoen har React/Vite frontend og en Node.js/Express/TypeORM backend (folder `backend-nodejs`). Flask-backenden er avviklet og fjernet fra aktiv kodebase.
 
 1) Arkitektur og nøkkelfiler
 - Backend (Node): `backend-nodejs/src/app.ts` (Express-setup), `src/data-source.ts` (AppDataSource/DB), `src/entities/*.ts` (TypeORM-modeller med toDict()), `src/routes/*.ts` (API-endepunkter).
@@ -11,11 +11,12 @@ Denne repoen har React/Vite frontend og en ny Node.js/Express/TypeORM backend (f
 - Backend: `cd backend-nodejs; npm install; npm run build; npm start` (prod) eller `npm run dev` (hot-reload via tsx). Server lytter på http://localhost:8000. Helse: GET `/health`.
 - Frontend: `cd frontend; npm install; npm run dev` (Vite på 5175). Proxy til backend er satt i `vite.config.js`.
 - Port-8000 trøbbel? Finn/kill prosess: `Get-NetTCPConnection -LocalPort 8000 | Select-Object OwningProcess | Stop-Process -Id <pid> -Force`.
+- Lær av gjentakende feil, særlig under smoketesting og helse-sjekker.
 
 3) API- og datamodell-konvensjoner
 - Entiteter eksponerer `toDict()` for API-svar. Datoer formateres i EU-format i flere entiteter (se `utils/dateUtils.ts`). Kart-endepunktet returnerer i tillegg `next_visit_date` som ISO og `status` for fargekoding.
 - Valider alltid heltalls-IDer i routes før DB-kall (returner 400 ved ugyldig input); verifiser at relaterte rader finnes.
-- Filopplasting og bilder serviceres under `/static` (map til `backend-nodejs/static/`).
+- Filopplasting og bilder serviceres under `/static` (map til `backend-nodejs/static/`). Opplastede utstyrs-bilder lagres i `static/uploads` og får URL `/static/uploads/<fil>`.
 
 4) Viktige endepunkter og mønstre
 - Kartdata: `GET /api/map/customers` → `{ id, name, latitude, longitude, next_visit_date, status }`. Frontend bruker `status` direkte til markørfarge.
@@ -36,8 +37,9 @@ Denne repoen har React/Vite frontend og en ny Node.js/Express/TypeORM backend (f
 - Legg til klient i `frontend/src/api.js` og kall fra komponent.
 
 7) Frontend-spesifikke mønstre
-- Ikke formatter om popup-HTML: event-bindingene forutsetter spesifikke klassenavn (`.btn-save-new`, `.nv-save`, etc.).
+- Ikke formatter om popup-HTML (for Leaflet): event-bindingene forutsetter spesifikke klassenavn (`.btn-save-new`, `.nv-save`, `.new-eq-type`, etc.).
 - Ved brukerinput for `datetime-local`, normaliser med `new Date(value).toISOString()` (se `MapView.jsx`/`CustomerDetail.jsx`).
+- Bruk kundelisten som mal for layout av andre lister i appen
 
 8) Feilsøking raskt
 - Sjekk at backend faktisk lytter: `netstat -ano | findstr :8000` (eller `Get-NetTCPConnection`).
@@ -54,3 +56,4 @@ Gi beskjed hvis noe er uklart eller mangler (f.eks. mer om auth, datoformat, ell
 	- TypeORM (v0.3+), Express, React, Vite, Leaflet, mysql2.
 	- Sjekk breaking changes/changelogs ved API-bruk som virker ukjent.
 - Bruk eksempler som kan kjøres lokalt (PowerShell-vennlige kommandoer) og referer til nøkkelfiler i dette repoet.
+- Logg endringer og oppdateringer i CHANGELOG.md. Dokumenter hva som er gjort mellom git-commits. Gjerne med tilbakevirkende kraft om nødvendig.

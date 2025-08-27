@@ -7,8 +7,11 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
 import { useToast } from './ui/Toast.jsx'
+import { useAuth } from './hooks/useAuth'
 
 export default function CustomerDetail({ customerId }) {
+  const { user } = useAuth()
+  const isAdmin = (user?.role === 'admin' || user?.role === 'manager')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -35,8 +38,12 @@ export default function CustomerDetail({ customerId }) {
   const [showEditCustomer, setShowEditCustomer] = useState(false)
   const [showVisits, setShowVisits] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
+  const [showReports, setShowReports] = useState(false)
   const [creatingVisit, setCreatingVisit] = useState(false)
   const [selectedVisits, setSelectedVisits] = useState([])
+  // admin bulk assign state
+  const [assignMeters, setAssignMeters] = useState(250)
+  const [assignLoading, setAssignLoading] = useState(false)
 
   const load = useCallback(async (opts) => {
     const silent = !!(opts && opts.silent)
@@ -229,11 +236,35 @@ export default function CustomerDetail({ customerId }) {
         const root = m.getPopup().getElement()
         const btnSave = root.querySelector('.btn-save-move')
         const btnCancel = root.querySelector('.btn-cancel-move')
-  if (btnSave) btnSave.addEventListener('click', async (_ev) => {
+        if (btnSave) btnSave.addEventListener('click', async (_ev) => {
           _ev.preventDefault(); _ev.stopPropagation()
           const ll = m.getLatLng()
             try {
               await EquipmentAPI.update(id, { latitude: ll.lat, longitude: ll.lng })
+              // Dry-run: foreslå nærmeste kunde, be om bekreftelse før tilordning
+              try {
+                const probe = await EquipmentAPI.assignNearest(id, { max_distance_m: 250, dry_run: true })
+                if (probe && probe.nearest_customer_id && probe.within_threshold && Number(probe.nearest_customer_id) !== Number(customerId)) {
+                  const km = Math.round((Number(probe.distance_meters||0))/10)/100 // to km med 2 desimaler
+                  const ok = window.confirm(`Foreslått ny kunde basert på posisjon: #${probe.nearest_customer_id} (${probe.nearest_customer_name || ''}) ca. ${km} km unna. Vil du tilordne utstyret til denne kunden?`)
+                  if (ok) {
+                    const res = await EquipmentAPI.assignNearest(id, { max_distance_m: 250, force: true })
+                    if (res && res.assigned_customer_id) {
+                      const reassignedId = Number(res.assigned_customer_id)
+                      if (reassignedId && reassignedId !== Number(customerId)) {
+                        toast.push({ variant: 'info', title: 'Tilordnet nærmeste kunde', description: `Utstyr flyttet til kunde #${reassignedId}.` })
+                        try { map.removeLayer(m); moveMarkerRef.current = null } catch (e) { console.debug(e) }
+                        window.location.hash = `customer:${reassignedId}`
+                        return
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                // Ikke-kritisk: bare logg, vis mild toast
+                console.debug(e)
+                toast.push({ variant: 'warning', title: 'Kunne ikke foreslå tilordning', description: 'Posisjon ble lagret, men forslag feilet.' })
+              }
               toast.push({ variant: 'success', title: 'Lagret', description: 'Posisjon oppdatert.' })
               try { map.removeLayer(m); moveMarkerRef.current = null } catch (e) { console.debug(e) }
               await load({ silent: true })
@@ -330,7 +361,7 @@ export default function CustomerDetail({ customerId }) {
           <div>Kontakt: {customer.contact_person || '-'}</div>
           <div>E-post: {customer.email || '-'} · Telefon: {customer.phone || '-'}</div>
         </div>
-        <div style={{ marginTop: 10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+  <div style={{ marginTop: 10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           {(() => {
             // Kun vis aktiv knapp for pågående oppdrag (ikke planlagt)
             const active = (data.visits || []).find(v => v.status === 'Pågående')
@@ -342,7 +373,7 @@ export default function CustomerDetail({ customerId }) {
                 </>
               )
             }
-            return (<Button type="button" onClick={() => setCreatingVisit(v => !v)}>+ Nytt oppdrag</Button>)
+            return isAdmin ? (<Button type="button" onClick={() => setCreatingVisit(v => !v)}>+ Nytt oppdrag</Button>) : null
           })()}
         </div>
         {creatingVisit && (
@@ -470,12 +501,20 @@ export default function CustomerDetail({ customerId }) {
                     const popupHtml = `
                       <div style="min-width:260px">
                         <div style="font-size:12px;color:#475569;margin-bottom:6px">Flytt ny markør til riktig sted, velg type og egenskaper.</div>
-                        <label style="display:block;margin-bottom:6px;font-size:13px">Navn<input class="new-eq-name" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label>
-                        <label style="display:block;margin-bottom:6px;font-size:13px">Type<select class="new-eq-type" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">Laster…</option></select></label>
+                        <label style="display:block;margin-bottom:6px;font-size:13px">Navn
+                          <input class="new-eq-name" placeholder="F.eks. Åtestasjon ved inngang" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" />
+                        </label>
+                        <label style="display:block;margin-bottom:6px;font-size:13px">Type
+                          <select class="new-eq-type" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px"><option value="">Velg…</option></select>
+                        </label>
                         <a href="#" class="toggle-props" style="font-size:12px;color:#2563eb;display:block;margin-top:6px">Vis detaljer</a>
                         <div class="new-eq-props" style="display:none;margin-bottom:6px"></div>
-                        <label style="display:block;margin-bottom:6px;font-size:13px">Plassering (beskrivelse)<input class="new-eq-notes" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" /></label>
-                        <label style="display:block;margin-bottom:6px;font-size:13px">Bilde (kun mobil)<input accept="image/*" capture="environment" type="file" class="new-eq-photo" style="width:100%;margin-top:6px" /></label>
+                        <label style="display:block;margin-bottom:6px;font-size:13px">Plassering (beskrivelse)
+                          <input class="new-eq-notes" placeholder="Hvor står utstyret? (f.eks. bak dør, ved søppeldunk)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px" />
+                        </label>
+                        <label style="display:block;margin-bottom:6px;font-size:13px">Bilde (valgfritt, kun mobil)
+                          <input accept="image/*" capture="environment" type="file" class="new-eq-photo" style="width:100%;margin-top:6px" />
+                        </label>
                         <div class="new-eq-photo-preview" style="margin-top:6px"></div>
                         <div style="display:flex;gap:6px;justify-content:flex-end">
                           <button type="button" class="btn-cancel-new" style="padding:6px 10px;font-size:13px">Avbryt</button>
@@ -667,6 +706,44 @@ export default function CustomerDetail({ customerId }) {
               <Button type="button" onClick={() => { try { mapRef.current?.invalidateSize(true) } catch (e) { console.debug(e) } }}>Oppdater kart</Button>
             </div>
           </div>
+          {isAdmin && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>Admin: Tilordne nærliggende utstyr til denne kunden</div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                <label className="stack" style={{ gap:4 }}>
+                  <div>Avstandsterskel (meter)</div>
+                  <input className="input" type="number" min="1" value={assignMeters} onChange={e => setAssignMeters(Number(e.target.value || 0))} style={{ width: 160 }} />
+                </label>
+                <Button type="button" disabled={assignLoading} onClick={async () => {
+                  if (!Number.isFinite(assignMeters) || assignMeters <= 0) { toast.push({ variant:'error', title:'Ugyldig terskel', description:'Skriv inn en positiv avstand i meter.' }); return }
+                  setAssignLoading(true)
+                  try {
+                    const probe = await EquipmentAPI.assignToCustomerByCoords(customerId, { max_distance_m: assignMeters, dry_run: true })
+                    const n = Array.isArray(probe?.items) ? probe.items.length : 0
+                    if (n === 0) {
+                      toast.push({ variant:'info', title:'Ingen endringer', description:'Ingen utstyr innenfor valgt terskel.' })
+                      return
+                    }
+                    const preview = (probe.items || []).slice(0, 6).map(x => `#${x.equipment_id} (${x.distance_meters}m)`).join(', ')
+                    const msg = `Foreslåtte endringer: ${n} utstyr vil tilordnes denne kunden. ${preview ? `\nEksempler: ${preview}` : ''}\n\nVil du fortsette?`
+                    const ok = window.confirm(msg)
+                    if (!ok) return
+                    const res = await EquipmentAPI.assignToCustomerByCoords(customerId, { max_distance_m: assignMeters })
+                    const changed = Number(res?.changed_count || 0)
+                    toast.push({ variant:'success', title:'Tilordnet', description:`${changed} utstyr tilordnet denne kunden.` })
+                    await load({ silent: true })
+                  } catch (e) {
+                    console.debug(e)
+                    const msg = e?.response?.data?.error || e?.message || 'Kunne ikke tilordne utstyr'
+                    toast.push({ variant:'error', title:'Feil', description: String(msg) })
+                  } finally {
+                    setAssignLoading(false)
+                  }
+                }}>{assignLoading ? 'Kjører…' : 'Tilordne nærliggende utstyr'}</Button>
+              </div>
+              <div style={{ color:'#475569', fontSize:12, marginTop:6 }}>Vi gjør først en «dry-run» og ber om bekreftelse før endringer lagres.</div>
+            </div>
+          )}
           {/* Utstyr vises kun på kartet. Bruk markørene for handlinger (Flytt, Rediger, Slett). */}
           <div style={{ marginTop: 12 }}>
             {!data.equipment?.length ? <Empty>Ingen registrert utstyr.</Empty> : (
@@ -753,6 +830,41 @@ export default function CustomerDetail({ customerId }) {
                     ))}
                   </ul>
                 </>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Servicerapporter (PDF)">
+        {!showReports ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ color: '#475569', fontSize: 13 }}>Klikk for å vise genererte rapporter.</div>
+            <div>
+              <Button type="button" onClick={() => setShowReports(true)}>Vis rapporter</Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div>Rapporter</div>
+              <div><Button type="button" onClick={() => setShowReports(false)}>Skjul</Button></div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {!data.reports?.length ? <Empty>Ingen rapporter generert ennå.</Empty> : (
+                <ul className="list">
+                  {data.reports.map(r => (
+                    <li key={r.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>Rapport #{r.id}</div>
+                        <div style={{ fontSize: 13, color:'#475569' }}>{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</div>
+                      </div>
+                      <div>
+                        <a className="btn" href={r.url || r.file_path} target="_blank" rel="noopener noreferrer">Åpne PDF</a>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>

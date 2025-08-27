@@ -43,6 +43,9 @@ export class Customer {
   @Column({ type: "float", nullable: true })
   longitude?: number;
 
+  @Column({ type: "tinyint", width: 1, default: () => "1" })
+  active!: boolean;
+
   // Relationships
   @OneToMany(() => Visit, visit => visit.customer, { cascade: true })
   visits!: Visit[];
@@ -70,6 +73,7 @@ export class Customer {
   start_date: formatEuropeanDate(this.startDate),
       latitude: this.latitude,
       longitude: this.longitude,
+  active: this.active,
     };
   }
 }

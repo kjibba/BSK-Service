@@ -380,7 +380,7 @@ html[data-theme='dark'] .map-legend, html[data-theme='dark'] .map-toggle { color
 .hero { background: linear-gradient(180deg, var(--surface), transparent); }
 
 /* Toasts */
-.toaster { position: fixed; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 2000; }
+.toaster { position: fixed; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 5000; }
 .toast { display: flex; align-items: start; gap: 8px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); min-width: 240px; max-width: 360px; }
 .toast .toast-title { font-weight: 700; margin-bottom: 2px; }
 .toast .toast-desc { color: var(--muted); font-size: 14px; }

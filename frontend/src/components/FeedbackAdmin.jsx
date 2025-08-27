@@ -13,7 +13,7 @@ export default function FeedbackAdmin(){
     setLoading(true)
     try {
       const r = await FeedbackAPI.list(tail)
-      setItems(r.items || [])
+      setItems(Array.isArray(r) ? r : (r?.items || []))
     } catch (e) {
       console.error(e)
       setItems([])
@@ -27,7 +27,7 @@ export default function FeedbackAdmin(){
   const openDetail = async (id) => {
     try {
       const r = await FeedbackAPI.detail(id)
-      setSelected(r.item || null)
+      setSelected(r || null)
     } catch (e) {
       console.error(e)
     }
@@ -58,7 +58,7 @@ export default function FeedbackAdmin(){
       {loading ? <div>Laster…</div> : (
         <div style={{display:'flex',gap:16}}>
           <ul style={{flex:1}}>
-            {items.map(it => (
+            {(items || []).slice(0, Math.max(0, Number(tail) || 0)).map(it => (
               <li key={it.id} style={{padding:8,borderBottom:'1px solid #eee',cursor:'pointer'}} onClick={() => openDetail(it.id)}>
                 <div style={{fontSize:13,fontWeight:600}}>{it.text}</div>
                 <div style={{fontSize:12,color:'#666'}}>{it.created_at} — {it.user_email || 'anon'}</div>

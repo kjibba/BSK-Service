@@ -5,6 +5,8 @@ import { Equipment } from "../entities/Equipment";
 import { Visit } from "../entities/Visit";
 import { ServiceLog } from "../entities/ServiceLog";
 import { In } from "typeorm";
+import { ServiceReport } from "../entities/ServiceReport";
+import { requireJwt, requireAdmin } from "./auth";
 
 const router = express.Router();
 
@@ -12,12 +14,26 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
-    const { sort, include, has_coords } = req.query;
+    const { sort, include, has_coords, q, city, bydel } = req.query as any;
 
     let query = customerRepository.createQueryBuilder("customer");
+    // Default til aktive kunder om ikke eksplisitt bedt om noe annet via include
+    if (include !== "all") {
+      query = query.where("customer.active = 1");
+    }
 
     if (has_coords === "1" || has_coords === "true") {
       query = query.where("customer.latitude IS NOT NULL AND customer.longitude IS NOT NULL");
+    }
+
+    // Simple filters
+    const search = (q ?? "").toString().trim();
+    if (search) {
+      query = query.andWhere("(customer.name LIKE :q OR customer.address LIKE :q)", { q: `%${search}%` });
+    }
+    const cityFilter = (city ?? bydel ?? "").toString().trim();
+    if (cityFilter) {
+      query = query.andWhere("customer.city LIKE :city", { city: `%${cityFilter}%` });
     }
 
     const customers = await query.getMany();
@@ -106,6 +122,18 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error("Error fetching customers:", error);
     res.status(500).json({ error: "Failed to fetch customers" });
+  }
+});
+
+// GET /api/customers/inactive - list inaktive kunder (admin)
+router.get("/inactive", requireJwt, requireAdmin(), async (_req, res) => {
+  try {
+    const repo = AppDataSource.getRepository(Customer);
+    const customers = await repo.find({ where: { active: false } as any, order: { name: "ASC" } });
+    res.json(customers.map(c => c.toDict()));
+  } catch (error) {
+    console.error("Error fetching inactive customers:", error);
+    res.status(500).json({ error: "Failed to fetch inactive customers" });
   }
 });
 
@@ -233,6 +261,7 @@ router.post("/", async (req, res) => {
     customer.contactPerson = contact_person;
     customer.email = email;
     customer.phone = phone;
+  customer.active = true;
 
     await customerRepository.save(customer);
     res.status(201).json(customer.toDict());
@@ -283,7 +312,7 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    const { name, address, postal_code, city, contact_person, email, phone, latitude, longitude } = req.body;
+  const { name, address, postal_code, city, contact_person, email, phone, latitude, longitude, active } = req.body;
 
     if (name !== undefined) customer.name = name;
     if (address !== undefined) customer.address = address;
@@ -294,6 +323,7 @@ router.put("/:id", async (req, res) => {
     if (phone !== undefined) customer.phone = phone;
     if (latitude !== undefined) customer.latitude = latitude;
     if (longitude !== undefined) customer.longitude = longitude;
+  if (active !== undefined) customer.active = !!active;
 
     await customerRepository.save(customer);
     res.json(customer.toDict());
@@ -336,6 +366,7 @@ router.get("/:id/detail", async (req, res) => {
     const equipmentRepository = AppDataSource.getRepository(Equipment);
     const visitRepository = AppDataSource.getRepository(Visit);
     const serviceLogRepository = AppDataSource.getRepository(ServiceLog);
+  const reportRepo = AppDataSource.getRepository(ServiceReport);
 
     const customer = await customerRepository.findOne({
       where: { id: customerId }
@@ -404,15 +435,52 @@ router.get("/:id/detail", async (req, res) => {
       return obj;
     });
 
+    const reports = await reportRepo.find({ where: { customerId }, order: { createdAt: "DESC" } as any });
+
     res.json({
       customer: customerObj,
       equipment: equipment.map(e => e.toDict()),
       visits: visits.map(v => v.toDict()),
-      logs
+      logs,
+      reports: reports.map(r => r.toDict()),
     });
   } catch (error) {
     console.error("Error fetching customer detail:", error);
     res.status(500).json({ error: "Failed to fetch customer detail" });
+  }
+});
+
+// PUT /api/customers/:id/deactivate
+router.put("/:id/deactivate", requireJwt, requireAdmin(), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id must be an integer" });
+    const repo = AppDataSource.getRepository(Customer);
+    const customer = await repo.findOne({ where: { id } });
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    customer.active = false;
+    await repo.save(customer);
+    res.json(customer.toDict());
+  } catch (error) {
+    console.error("Error deactivating customer:", error);
+    res.status(500).json({ error: "Failed to deactivate customer" });
+  }
+});
+
+// PUT /api/customers/:id/reactivate
+router.put("/:id/reactivate", requireJwt, requireAdmin(), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id must be an integer" });
+    const repo = AppDataSource.getRepository(Customer);
+    const customer = await repo.findOne({ where: { id } });
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    customer.active = true;
+    await repo.save(customer);
+    res.json(customer.toDict());
+  } catch (error) {
+    console.error("Error reactivating customer:", error);
+    res.status(500).json({ error: "Failed to reactivate customer" });
   }
 });
 

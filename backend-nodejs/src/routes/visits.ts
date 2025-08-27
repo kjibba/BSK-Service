@@ -6,10 +6,41 @@ import { ServiceLog } from "../entities/ServiceLog";
 import { Employee } from "../entities/Employee";
 import { Equipment } from "../entities/Equipment";
 import { In } from "typeorm";
+import { requireJwt, requireAdmin } from "./auth";
+import path from "path";
+import { sendMail } from "../utils/mailer";
+import { generateServiceReportPdf } from "../utils/reportPdf";
+import { ServiceReport } from "../entities/ServiceReport";
 
 const router = express.Router();
 // Separate router for office-specific listing to avoid '/:id' conflicts
 export const officeVisitsRouter = express.Router();
+
+// POST /api/visits/start_or_create_by_customer { customer_id }
+router.post("/start_or_create_by_customer", async (req, res) => {
+  try {
+    const cid = Number((req.body as any)?.customer_id);
+    if (!Number.isInteger(cid)) return res.status(400).json({ error: "customer_id must be an integer" });
+    const repo = AppDataSource.getRepository(Visit);
+    // check existing ongoing
+    const existing = await repo.createQueryBuilder("visit")
+      .where("visit.customerId = :cid", { cid })
+      .andWhere("visit.status = :s", { s: "Pågående" })
+      .orderBy("visit.startedAt", "DESC")
+      .getOne();
+    if (existing) return res.json(existing.toDict());
+    // else create planned visit dated now
+    const v = new Visit();
+    v.customerId = cid;
+    v.visitDate = new Date();
+    v.status = "Planlagt";
+    await repo.save(v);
+    res.status(201).json(v.toDict());
+  } catch (error) {
+    console.error("Error start_or_create_by_customer:", error);
+    res.status(500).json({ error: "Failed to start or create visit" });
+  }
+});
 
 // GET /api/visits
 router.get("/", async (req, res) => {
@@ -96,11 +127,47 @@ router.get("/my_missions", async (req, res) => {
   }
 });
 
+// GET /api/visits/active?customer_id=...
+router.get("/active", async (req, res) => {
+  try {
+    const cid = Number((req.query as any).customer_id);
+    if (!Number.isInteger(cid)) return res.status(400).json({ error: "customer_id must be an integer" });
+    const repo = AppDataSource.getRepository(Visit);
+    const v = await repo.createQueryBuilder("visit")
+      .where("visit.customerId = :cid", { cid })
+      .andWhere("visit.status = :s", { s: "Pågående" })
+      .orderBy("visit.startedAt", "DESC")
+      .getOne();
+    if (!v) return res.status(404).json({ error: "No active visit" });
+    res.json(v.toDict());
+  } catch (error) {
+    console.error("Error fetching active visit:", error);
+    res.status(500).json({ error: "Failed to fetch active visit" });
+  }
+});
+
+// GET /api/visits/report?startDate=...&endDate=...&technician=...
+router.get("/report", requireJwt, requireAdmin(), async (req, res) => {
+  try {
+    const { startDate, endDate, technician } = req.query as any;
+    const repo = AppDataSource.getRepository(Visit);
+    let qb = repo.createQueryBuilder("visit").leftJoinAndSelect("visit.customer", "customer");
+    if (startDate) qb = qb.andWhere("visit.visitDate >= :sd", { sd: new Date(String(startDate)) });
+    if (endDate) qb = qb.andWhere("visit.visitDate <= :ed", { ed: new Date(String(endDate)) });
+    if (technician) qb = qb.andWhere("visit.technician = :t", { t: String(technician) });
+    const items = await qb.orderBy("visit.visitDate", "DESC").getMany();
+    res.json(items.map(v => v.toDict()));
+  } catch (error) {
+    console.error("Error fetching report:", error);
+    res.status(500).json({ error: "Failed to fetch report" });
+  }
+});
+
 // POST /api/visits
 router.post("/", async (req, res) => {
   try {
     const visitRepository = AppDataSource.getRepository(Visit);
-    const { customer_id, visit_date, technician, notes, status } = req.body;
+  const { customer_id, visit_date, technician, notes, status, assigned_technician_id } = req.body;
 
     if (!customer_id || !visit_date) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -112,6 +179,10 @@ router.post("/", async (req, res) => {
     visit.technician = technician;
     visit.notes = notes;
     visit.status = status || "Planlagt";
+    if (assigned_technician_id !== undefined) {
+      const tid = Number(assigned_technician_id);
+      if (!Number.isNaN(tid)) visit.assignedTechnicianId = tid;
+    }
 
     await visitRepository.save(visit);
     res.status(201).json(visit.toDict());
@@ -122,7 +193,7 @@ router.post("/", async (req, res) => {
 });
 
 // POST /api/office/visits - create visit from office
-officeVisitsRouter.post("/", async (req, res) => {
+officeVisitsRouter.post("/", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const visitRepository = AppDataSource.getRepository(Visit);
     const { customer_id, visit_date, assigned_technician_id, notes, technician } = req.body || {};
@@ -291,6 +362,77 @@ router.post("/:id/complete", async (req, res) => {
     if (sjekk_inngangspunkter !== undefined) visit.sjekkInngangspunkter = !!sjekk_inngangspunkter;
     if (sjekk_fellefangst !== undefined) visit.sjekkFellefangst = !!sjekk_fellefangst;
     await repo.save(visit);
+
+    // Build PDF data from visit, customer and logs
+    try {
+      const custRepo = AppDataSource.getRepository(Customer);
+      const logRepo = AppDataSource.getRepository(ServiceLog);
+      const equipRepo = AppDataSource.getRepository(Equipment);
+      const customer = await custRepo.findOne({ where: { id: visit.customerId } });
+      const logs = await logRepo.find({ where: { visitId: visit.id }, order: { logDate: "ASC" } });
+      const eqIds = Array.from(new Set(logs.map(l => l.equipmentId))).filter(Boolean) as number[];
+      const names = new Map<number, string>();
+      if (eqIds.length) {
+        const list = await equipRepo.find({ where: { id: In(eqIds) } });
+        list.forEach(e => names.set(e.id, e.name || "Utstyr"));
+      }
+      const reportData = {
+        customer: {
+          id: customer?.id || 0,
+          name: customer?.name,
+          address: customer?.address,
+          postal_code: customer?.postalCode,
+          city: customer?.city,
+          email: customer?.email,
+        },
+        visit: {
+          id: visit.id,
+          visit_date: visit.visitDate ? visit.visitDate.toISOString() : undefined,
+          started_at: visit.startedAt ? visit.startedAt.toISOString() : null,
+          completed_at: visit.completedAt ? visit.completedAt.toISOString() : null,
+          technician: visit.technician || null,
+          notes: visit.notes || null,
+          oppsummering_notat: visit.oppsummeringNotat || null,
+        },
+        logs: logs.map(l => ({
+          id: l.id,
+          log_date: l.logDate ? l.logDate.toISOString() : undefined,
+          description: l.description || "",
+          hours_worked: l.hoursWorked || undefined,
+          equipment_name: names.get(l.equipmentId) || null,
+        })),
+      };
+
+      const outDir = path.join(__dirname, "../static/reports");
+      const { filePath, absPath } = await generateServiceReportPdf(reportData as any, outDir);
+
+      // Save report row
+      const repRepo = AppDataSource.getRepository(ServiceReport);
+      const sr = new ServiceReport();
+      sr.visitId = visit.id;
+      sr.customerId = visit.customerId;
+      sr.filePath = filePath.startsWith('/static') ? filePath : `/static/${filePath}`.replace(/\\/g,'/');
+      await repRepo.save(sr);
+
+      // Send email with attachment to fixed recipient for now
+      const to = "kjibba@gmail.com";
+      const subj = `Servicerapport ${customer?.name || ''} — Besøk #${visit.id}`.trim();
+      const html = `<p>Hei,</p><p>Vedlagt servicerapport for kunde <strong>${customer?.name || ''}</strong> (besøk #${visit.id}).</p><p>Mvh,<br/>BSK Service App</p>`;
+      try {
+        await sendMail({
+          to,
+          subject: subj,
+          html,
+          attachments: [ { filename: `servicerapport_${visit.id}.pdf`, path: absPath, contentType: 'application/pdf' } ],
+        });
+      } catch (mailErr) {
+        console.error('Epost-feil:', mailErr);
+      }
+    } catch (genErr) {
+      console.error('Feil ved generering/sending av rapport:', genErr);
+      // Continue; completion should not fail due to report/email issues
+    }
+
     res.json(visit.toDict());
   } catch (error) {
     console.error("Error completing visit:", error);
@@ -375,7 +517,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 // POST /api/visits/batch_delete - delete multiple planned visits by ids
-router.post("/batch_delete", async (req, res) => {
+router.post("/batch_delete", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const { ids } = req.body || {};
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -401,7 +543,7 @@ router.post("/batch_delete", async (req, res) => {
 });
 
 // GET /api/office/visits - Office-specific visits endpoint
-officeVisitsRouter.get("/", async (req, res) => {
+officeVisitsRouter.get("/", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const visitRepository = AppDataSource.getRepository(Visit);
     const visits = await visitRepository.find({
@@ -417,7 +559,7 @@ officeVisitsRouter.get("/", async (req, res) => {
 });
 
 // POST /api/office/visits/:id/assign - office assign helper
-officeVisitsRouter.post("/:id/assign", async (req, res) => {
+officeVisitsRouter.post("/:id/assign", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: "id must be an integer" });

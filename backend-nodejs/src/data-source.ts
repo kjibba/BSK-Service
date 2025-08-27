@@ -12,6 +12,7 @@ import { RouteChoice } from "./entities/RouteChoice";
 import { Photo } from "./entities/Photo";
 import { Feedback } from "./entities/Feedback";
 import { DailyTask } from "./entities/DailyTask";
+import { ServiceReport } from "./entities/ServiceReport";
 
 const DB_HOST = process.env.DB_HOST || "localhost";
 const DB_PORT = parseInt(process.env.DB_PORT || "3306");
@@ -41,6 +42,7 @@ export const AppDataSource = new DataSource({
     Photo,
     Feedback,
     DailyTask,
+  ServiceReport,
   ],
   migrations: ["src/migrations/*.ts"],
   subscribers: [],

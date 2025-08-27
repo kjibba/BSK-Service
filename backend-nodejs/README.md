@@ -69,3 +69,14 @@ See `.env.example` for required configuration including database connection and 
 3. Add comprehensive error handling
 4. Set up automated testing
 5. Deploy to production environment
+
+## Servicerapporter og e-post
+
+- Ved fullføring av et besøk genereres det en PDF-rapport i `static/reports/` og en rad lagres i tabellen `service_reports`.
+- Rapporten vises på kundekortet under «Servicerapporter (PDF)» og kan listes for admin via `GET /api/reports` eller per kunde via `GET /api/reports/by_customer/:id`.
+- E-post sendes (vedlegg: PDF) til en fast adresse (midlertidig): `kjibba@gmail.com`.
+
+SMTP-konfigurasjon (valgfritt – hvis ikke satt, brukes logg-transport som skriver e-posten som JSON):
+
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- `MAIL_FROM` (standard: `no-reply@bsk-service.local`)

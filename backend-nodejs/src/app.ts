@@ -25,10 +25,21 @@ import materialRoutes from "./routes/materials";
 import feedbackRoutes from "./routes/feedback";
 // @ts-ignore: route modules may be JS-built or generated at runtime
 import employeeRoutes from "./routes/employees";
+// @ts-ignore: route modules may be JS-built or generated at runtime
+import metaRoutes from "./routes/meta";
+// @ts-ignore: route modules may be JS-built or generated at runtime
+import routeChoicesRoutes from "./routes/routeChoices";
+// @ts-ignore: route modules may be JS-built or generated at runtime
+import reportsRoutes from "./routes/serviceReports";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || "development";
+
+// Minimal health endpoint registered BEFORE middleware so it can't be blocked by them
+app.get("/healthz", (_req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString() });
+});
 
 // Middleware
 app.use(cors({
@@ -87,13 +98,35 @@ app.use("/api/equipment", equipmentRoutes);
 app.use("/api/equipment-types", equipmentTypeRoutes);
 app.use("/api/service-logs", serviceLogRoutes);
 app.use("/api/materials", materialRoutes);
+app.use("/api/meta", metaRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/route-choices", routeChoicesRoutes);
+app.use("/api/reports", reportsRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Always log server-side
   console.error("Error:", err);
-  res.status(500).json({ error: "Internal server error" });
+  if (NODE_ENV === "development") {
+    // Surface details in dev to speed up debugging
+    res.status(500).json({
+      error: "Internal server error",
+      message: err?.message,
+      stack: err?.stack,
+      path: req.path,
+    });
+  } else {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Global process-level error logging (dev aid)
+process.on("unhandledRejection", (reason) => {
+  console.error("UnhandledRejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("UncaughtException:", err);
 });
 
 // Initialize database and start server

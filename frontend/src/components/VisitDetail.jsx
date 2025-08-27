@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, useContext } from 'react'
 import { VisitsAPI, EquipmentTypesAPI, MaterialsAPI, ServiceLogsAPI } from '../api'
 import Button from './ui/Button'
 import Card from './ui/Card'
 import { Loading, Empty } from './ui/States'
 import { useToast } from './ui/Toast.jsx'
 import { RequireAuth } from './auth'
+import { AuthCtx } from './authContext'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
@@ -20,6 +21,7 @@ export default function VisitDetail({ visitId }){
 
 function Inner({ visitId }){
   const toast = useToast()
+  const { user } = useContext(AuthCtx) || { user: null }
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [logForm, setLogForm] = useState({ equipment_id: '', description: '', hours_worked: '' })
@@ -31,6 +33,8 @@ function Inner({ visitId }){
   const [dynamicValues, setDynamicValues] = useState({})
   const [materials, setMaterials] = useState({ poison: [], nonpoison: [] })
   const [editingLog, setEditingLog] = useState(null)
+  const [savingLog, setSavingLog] = useState(false)
+  const [mapsKeyMissing, setMapsKeyMissing] = useState(false)
 
   const extractNote = useCallback((text) => {
     try {
@@ -65,7 +69,7 @@ function Inner({ visitId }){
   const mapRef = useRef(null)
   const markersRef = useRef(null)
   const layerCtrlRef = useRef(null)
-  const activeBaseRef = useRef('osm')
+  const activeBaseRef = useRef('google_sat')
   const [baseReady, setBaseReady] = useState(false)
 
   // Show labels for equipment at high zoom levels (mobile-friendly)
@@ -125,7 +129,7 @@ function Inner({ visitId }){
     return () => { canceled = true }
   }, [])
 
-  // Initialize map reliably (retry until container exists, mirror CustomerDetail behavior)
+  // Initialize map with Google only (no OSM fallback). Show placeholder if no API key.
   useEffect(() => {
     let cancelled = false
     const tryInit = () => {
@@ -133,45 +137,38 @@ function Inner({ visitId }){
       if (mapRef.current) return
       if (!mapEl.current) { setTimeout(tryInit, 120); return }
       try {
+        const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        if (!key) { setMapsKeyMissing(true); return }
         const map = L.map(mapEl.current, { center: [60.39299, 5.32415], zoom: 13 })
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' })
-        osm.addTo(map)
-        layerCtrlRef.current = { osm }
-        activeBaseRef.current = 'osm'
+        layerCtrlRef.current = { }
         markersRef.current = L.layerGroup().addTo(map)
         mapRef.current = map
-  setBaseReady(true)
-  try { map.on('zoomend', () => { try { updateMarkerLabels() } catch (e) {} }) } catch (e) {}
+        try { map.on('zoomend', () => { try { updateMarkerLabels() } catch (e) {} }) } catch (e) {}
         setTimeout(() => { try { map.invalidateSize(true) } catch (e) {} }, 50)
 
-        // Optional Google layers if key present
-        const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
         const tryAddGoogle = () => {
           try {
-            if (key && typeof window !== 'undefined' && window.google && L.gridLayer && L.gridLayer.googleMutant) {
-              const gRoad = L.gridLayer.googleMutant({ type: 'roadmap' })
+            if (typeof window !== 'undefined' && window.google && L.gridLayer && L.gridLayer.googleMutant) {
               const gSat = L.gridLayer.googleMutant({ type: 'satellite' })
+              const gRoad = L.gridLayer.googleMutant({ type: 'roadmap' })
               layerCtrlRef.current.gRoad = gRoad
               layerCtrlRef.current.gSat = gSat
-              // switch to satellite by default
-              try { map.removeLayer(osm) } catch (e) {}
               gSat.addTo(map); activeBaseRef.current = 'google_sat'
+              setBaseReady(true)
               setTimeout(() => { try { map.invalidateSize(true) } catch (e) {} }, 50)
             }
           } catch (e) {}
         }
-        if (key) {
-          const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
-          if (!existing) {
-            const s = document.createElement('script')
-            s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`
-            s.async = true; s.defer = true
-            s.onload = () => { tryAddGoogle() }
-            s.onerror = () => {}
-            document.head.appendChild(s)
-          } else {
-            setTimeout(() => { tryAddGoogle() }, 60)
-          }
+        const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
+        if (!existing) {
+          const s = document.createElement('script')
+          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`
+          s.async = true; s.defer = true
+          s.onload = () => { tryAddGoogle() }
+          s.onerror = () => { setMapsKeyMissing(true) }
+          document.head.appendChild(s)
+        } else {
+          setTimeout(() => { tryAddGoogle() }, 60)
         }
       } catch (e) {
         setTimeout(tryInit, 200)
@@ -294,12 +291,21 @@ function Inner({ visitId }){
   if (!data) return <div>Ikke funnet.</div>
 
   const v = data.visit
-  const canStart = v.status === 'Planlagt' || !v.status
+  const role = (user && user.role) || ''
+  const isAdminOrManager = role === 'admin' || role === 'manager'
+  const canStart = (v.status === 'Planlagt' || !v.status)
   const canComplete = v.status === 'Pågående'
-  const canDelete = v.status === 'Planlagt'
+  const canDelete = (v.status === 'Planlagt') && isAdminOrManager
 
   const addLog = async (e) => {
     e.preventDefault()
+    if (savingLog) return
+    // Basic validation of numeric inputs
+    const nonNeg = (val) => val === '' || val == null || (typeof val === 'number' ? val >= 0 : Number(val) >= 0)
+    if (!nonNeg(logForm.hours_worked)) { toast.push({ variant:'error', title:'Ugyldig timer', description:'Timer må være et ikke-negativt tall.' }); return }
+    if (!nonNeg(dynamicValues.giftaate_etterfylt) || !nonNeg(dynamicValues.giftfritt_etterfylt)) {
+      toast.push({ variant:'error', title:'Ugyldig mengde', description:'Etterfylt mengde må være et ikke-negativt tall.' }); return
+    }
     const parts = []
     if (selectedEq && selectedEq.type) parts.push(`[${selectedEq.type}]`)
     Object.entries(dynamicValues || {}).forEach(([k, val]) => { parts.push(`${k}: ${val === true ? 'ja' : val === false ? 'nei' : (val ?? '')}`) })
@@ -329,16 +335,24 @@ function Inner({ visitId }){
       }
       payload.description = parts.join(' | ')
     }
-    if (editingLog && editingLog.id) {
-      await ServiceLogsAPI.update(editingLog.id, payload)
-    } else {
-      await VisitsAPI.logs.create(visitId, payload)
+    try {
+      setSavingLog(true)
+      if (editingLog && editingLog.id) {
+        await ServiceLogsAPI.update(editingLog.id, payload)
+      } else {
+        await VisitsAPI.logs.create(visitId, payload)
+      }
+      setLogForm({ equipment_id: '', description: '', hours_worked: '' })
+      setShowLogModal(false)
+      setEditingLog(null)
+      toast.push({ variant: 'success', title: 'Logg lagret' })
+      await load({ silent: true })
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Kunne ikke lagre logg'
+      toast.push({ variant: 'error', title: 'Lagring feilet', description: String(msg) })
+    } finally {
+      setSavingLog(false)
     }
-    setLogForm({ equipment_id: '', description: '', hours_worked: '' })
-    setShowLogModal(false)
-    setEditingLog(null)
-    toast.push({ variant: 'success', title: 'Logg lagret' })
-  await load({ silent: true })
   }
 
   const start = async () => {
@@ -367,9 +381,14 @@ function Inner({ visitId }){
       const ok2 = window.confirm('Sjekklisten er ikke komplett. Vil du fullføre likevel?')
       if (!ok2) return
     }
-    await VisitsAPI.complete(visitId, { summary, checklist })
-    toast.push({ variant: 'success', title: 'Besøk fullført' })
-    window.location.hash = 'missions'
+    try {
+      await VisitsAPI.complete(visitId, { summary, checklist })
+      toast.push({ variant: 'success', title: 'Besøk fullført' })
+      window.location.hash = 'missions'
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Kunne ikke fullføre besøk'
+      toast.push({ variant: 'error', title: 'Fullføring feilet', description: String(msg) })
+    }
   }
 
   const niceName = (k) => {
@@ -414,9 +433,13 @@ function Inner({ visitId }){
       </Card>
 
       <Card title="Utstyrskart">
-        <div style={{ height: 380, borderRadius: 8, overflow: 'hidden' }}>
-          <div ref={mapEl} style={{ width: '100%', height: '100%' }} />
-        </div>
+        {mapsKeyMissing ? (
+          <div className="card" style={{padding:12, fontSize:14, color:'#475569'}}>Google Maps API-nøkkel mangler. Kartet kan ikke vises.</div>
+        ) : (
+          <div style={{ height: 380, borderRadius: 8, overflow: 'hidden' }}>
+            <div ref={mapEl} style={{ width: '100%', height: '100%' }} />
+          </div>
+        )}
         {(!data.equipment || data.equipment.length === 0) ? (
           <div style={{marginTop:8, fontSize:13, color:'#475569'}}>Ingen utstyr registrert hos kunden ennå. Du kan legge til utstyr fra kundekortet.</div>
         ) : (
@@ -572,8 +595,8 @@ function Inner({ visitId }){
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
                 <div style={{fontSize:12,color:'#64748b'}}>{editingLog ? 'Redigerer tidligere logg for dette utstyret' : ''}</div>
                 <div style={{display:'flex',gap:8}}>
-                  <Button type="button" onClick={()=> { setShowLogModal(false); setEditingLog(null) }}>Avbryt</Button>
-                  <Button variant="primary" type="submit">{editingLog ? 'Oppdater' : 'Lagre'}</Button>
+                  <Button type="button" onClick={()=> { if (!savingLog) { setShowLogModal(false); setEditingLog(null) } }} disabled={savingLog}>Avbryt</Button>
+                  <Button variant="primary" type="submit" disabled={savingLog}>{savingLog ? 'Lagrer…' : (editingLog ? 'Oppdater' : 'Lagre')}</Button>
                 </div>
               </div>
             </form>

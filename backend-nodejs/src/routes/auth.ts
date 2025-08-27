@@ -1,6 +1,7 @@
 import express from "express";
 import { AppDataSource } from "../data-source";
 import { Employee } from "../entities/Employee";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -50,14 +51,14 @@ router.post("/login", async (req, res) => {
       role: row.e_role ?? row.role ?? "",
     };
 
-    res.json({
-      user: {
-        id: req.session.user.id,
-        email: req.session.user.email,
-        name: req.session.user.name,
-        role: req.session.user.role,
-      }
-    });
+    const payload = {
+      sub: req.session.user.id,
+      email: req.session.user.email,
+      name: req.session.user.name,
+      role: req.session.user.role,
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET || (process.env.SECRET_KEY || "dev-secret-change-me"), { expiresIn: "12h" });
+    res.json({ user: payload, token });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
@@ -110,3 +111,40 @@ router.get("/whoami", async (req, res) => {
 });
 
 export default router;
+// Compatibility aliases per spec
+// GET /api/auth/me -> whoami
+router.get("/me", (req, res, next) => (router as any).handle({ ...req, url: "/whoami", method: "GET" }, res, next));
+
+// POST /api/auth/register - not implemented in our model (use /api/employees instead)
+router.post("/register", (_req, res) => {
+  res.status(501).json({ error: "Not implemented. Create users via /api/employees." });
+});
+
+// JWT guard middleware (optional usage in other routers if needed)
+export function requireJwt(req: any, res: any, next: any) {
+  try {
+    const h = req.headers?.authorization || "";
+    const t = h.startsWith("Bearer ") ? h.slice(7) : null;
+    if (!t) return res.status(401).json({ error: "Missing token" });
+    const decoded = jwt.verify(t, process.env.JWT_SECRET || (process.env.SECRET_KEY || "dev-secret-change-me"));
+    (req as any).jwt = decoded;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+// Require one of the provided roles (e.g., 'admin', 'manager')
+export function requireRole(...roles: string[]) {
+  return function (req: any, res: any, next: any) {
+    const role = req?.jwt?.role || req?.session?.user?.role;
+    if (!role) return res.status(403).json({ error: "Forbidden" });
+    if (!roles.includes(String(role).toLowerCase())) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    return next();
+  };
+}
+
+// Common helper for admin-level access (admin or manager)
+export const requireAdmin = () => requireRole("admin", "manager");
