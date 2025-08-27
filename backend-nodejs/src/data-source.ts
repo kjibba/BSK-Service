@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
+import path from "path";
 import { Customer } from "./entities/Customer";
 import { Visit } from "./entities/Visit";
 import { Equipment } from "./entities/Equipment";
@@ -47,6 +48,11 @@ export const AppDataSource = new DataSource({
     DailyTask,
   ServiceReport,
   ],
-  migrations: [process.env.NODE_ENV === 'production' ? "dist/migrations/*.js" : "src/migrations/*.ts"],
+  // In production, point to compiled JS migrations in dist using an absolute path
+  migrations: [
+    (NODE_ENV === 'production')
+      ? path.join(__dirname, 'migrations', '*.js')
+      : 'src/migrations/*.ts'
+  ],
   subscribers: [],
 });

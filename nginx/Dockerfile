@@ -1,5 +1,5 @@
 ### Multi-stage build: build frontend with node, then copy into nginx
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 # copy package files first for cached install
 COPY frontend/package.json frontend/package-lock.json* ./frontend/  
