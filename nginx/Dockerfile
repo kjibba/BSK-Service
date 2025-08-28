@@ -12,6 +12,8 @@ COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 COPY ./nginx/nginx.conf /etc/nginx/conf.d/default.conf
 # Optional: copy ssl certs if present
 COPY ./nginx/ssl /etc/nginx/ssl
+# Optional: copy any extra SSL server blocks (picked up by include *.ssl.conf)
+COPY ./nginx/*.ssl.conf /etc/nginx/conf.d/
 
 # expose port only for internal reference; mapping to host done in compose
 EXPOSE 80 443
