@@ -1,0 +1,54 @@
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile.local
+    ports:
+      - "5175:80" # serve SPA locally on 5175 to match Vite proxy expectations
+    volumes:
+      - backend_static:/app/static:ro
+    depends_on:
+      - backend
+    networks:
+      - bsk_net
+
+  backend:
+    # Standard: koble mot lokal db-tjeneste (under). Sett PROFIL=extdb for å bruke ekstern DB.
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
+      # Default internt: 'db'. For ekstern DB, sett DB_HOST=host.docker.internal eller IP i .env.local
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USERNAME=${DB_USERNAME:-${MYSQL_USER}}
+      - DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD}}
+      - DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE}}
+      - DB_SYNC=true
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_static:/app/static
+    # Når du bruker ekstern DB: kommenter linjen under eller sett en compose-profil som ikke inkluderer 'db'.
+    depends_on:
+      - db
+    networks:
+      - bsk_net
+
+  db:
+  # Lokal MariaDB for utvikling. Hopp over denne tjenesten hvis du peker backend mot ekstern DB.
+    ports:
+      - "3307:3306" # expose for local tools like HeidiSQL
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      - bsk_net
+
+volumes:
+  backend_static:
+
+networks:
+  bsk_net:
+    driver: bridge

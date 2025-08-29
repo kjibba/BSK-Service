@@ -1,0 +1,14 @@
+services:
+  backend:
+    environment:
+      # Peker backend til ekstern utviklingsdatabase
+      - NODE_ENV=development
+      - PORT=8000
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_SYNC=${DB_SYNC:-false}
+    depends_on: []
+  db: null

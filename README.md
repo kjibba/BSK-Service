@@ -69,6 +69,66 @@ Services:
 - Nginx: :80 (and 443 if configured)
 - Backend: internal :8000 (proxied by Nginx)
 - DB: internal MariaDB (volume `db_data`)
+
+## Lokal Docker (speil av prod)
+
+Kjør stacken lokalt i et miljø som matcher produksjon så tett som mulig:
+
+1) Lag en lokal env-fil
+
+```powershell
+cd F:\dev\BSK_Service_App
+copy .env.local.example .env.local
+# rediger .env.local hvis ønskelig (passord/porter)
+```
+
+2) Start Compose med local-override
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local up --build
+```
+
+Dette gir:
+- DB: MariaDB på localhost:3307 (for HeidiSQL)
+- Backend: http://localhost:8000
+- Frontend (via Nginx): http://localhost:5175
+
+Helse:
+- http://localhost:8000/health
+
+Stopp og rydd (inkl. volumer):
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local down -v
+```
+
+### Bruke ekstern utviklingsdatabase lokalt (valgfritt)
+
+Ønsker du at lokal backend skal koble seg mot en eksisterende utviklings‑DB (samme som før beta)?
+
+1) Sett disse i `.env.local`:
+
+```dotenv
+DB_HOST=host.docker.internal  # eller IP: 192.168.x.y
+DB_PORT=3306
+DB_USERNAME=<bruker>
+DB_PASSWORD=<passord>
+DB_DATABASE=<dbnavn>
+DB_SYNC=false                 # anbefalt for delt database
+```
+
+2) Start stacken som vanlig. Du kan la `db`‑tjenesten være stoppet; backend bruker DB_* variablene og trenger ikke lokal `db`.
+
+Tips: På Windows/macOS fungerer `host.docker.internal`. På Linux, bruk IP‑adressen til vertsmaskinen eller legg inn en rute/alias.
+
+Rask start med override‑fil:
+
+```powershell
+copy .env.extdb.example .env.extdb
+docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.local.extdb.yml --env-file .env.extdb up -d --build
+```
+
+
 ## Legacy (arkiv)
 
 Mappen `backend/` inneholder en eldre Flask-implementasjon. Den er bevart kun som referanse og vil fjernes i en senere opprydding. Ikke gjør endringer der.

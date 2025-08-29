@@ -21,7 +21,12 @@ const DB_USERNAME = process.env.DB_USERNAME || "bsk_user";
 const DB_PASSWORD = process.env.DB_PASSWORD || "et_sikkert_passord";
 const DB_DATABASE = process.env.DB_DATABASE || "bsk_service_db";
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const DB_SYNC = (process.env.DB_SYNC || '').toLowerCase() === 'true';
+// DB_SYNC styrer TypeORM synchronize. Hvis satt, brukes verdien (true/false). Hvis ikke satt,
+// er default: true i ikke-produksjon, false i produksjon.
+const DB_SYNC_RAW = process.env.DB_SYNC;
+const DB_SYNC_ENV = (DB_SYNC_RAW ?? '').toLowerCase() === 'true';
+const HAS_DB_SYNC = typeof DB_SYNC_RAW !== 'undefined';
+const isTsRuntime = __filename.endsWith('.ts');
 
 export const AppDataSource = new DataSource({
   type: "mysql",
@@ -30,8 +35,8 @@ export const AppDataSource = new DataSource({
   username: DB_USERNAME,
   password: DB_PASSWORD,
   database: DB_DATABASE,
-  // In production: always false. Locally, you can set DB_SYNC=true in .env to auto-create tables.
-  synchronize: NODE_ENV === 'production' ? false : (DB_SYNC || true),
+  // Synchronize: hvis DB_SYNC er satt, bruk den eksplisitt; ellers default (true i dev, false i prod)
+  synchronize: HAS_DB_SYNC ? DB_SYNC_ENV : (NODE_ENV !== 'production'),
   logging: NODE_ENV !== "production",
   entities: [
     Customer,
@@ -48,11 +53,7 @@ export const AppDataSource = new DataSource({
     DailyTask,
   ServiceReport,
   ],
-  // In production, point to compiled JS migrations in dist using an absolute path
-  migrations: [
-    (NODE_ENV === 'production')
-      ? path.join(__dirname, 'migrations', '*.js')
-      : 'src/migrations/*.ts'
-  ],
+  // Use TS migrations when running via tsx, else compiled JS from dist
+  migrations: [ isTsRuntime ? 'src/migrations/*.ts' : path.join(__dirname, 'migrations', '*.js') ],
   subscribers: [],
 });

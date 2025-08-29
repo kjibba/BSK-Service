@@ -3,7 +3,11 @@ import { AppDataSource } from "../data-source";
 import { Employee } from "../entities/Employee";
 
 async function main() {
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.ADMIN_USERNAME || "admin";
+  // Default-adresse: i utvikling bruker vi "admin@local" for å matche lokale tester; ellers "admin"
+  const ADMIN_EMAIL =
+    process.env.ADMIN_EMAIL ||
+    process.env.ADMIN_USERNAME ||
+    (process.env.NODE_ENV === "development" ? "admin@local" : "admin");
   const ADMIN_NAME = process.env.ADMIN_NAME || "Administrator";
   const ADMIN_ROLE = (process.env.ADMIN_ROLE || "admin").toLowerCase();
   // NOTE: Password is not used in current auth flow; kept for future compatibility

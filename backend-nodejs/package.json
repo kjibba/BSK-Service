@@ -10,6 +10,7 @@
     "migration:generate": "tsx src/data-source.ts migration:generate",
     "migration:run": "tsx src/run-migrations.ts",
   "seed:admin": "tsx src/scripts/seedAdmin.ts",
+  "user:set-password": "tsx src/scripts/setPassword.ts",
     "migration:show": "node -e \"require('./dist/data-source.js').AppDataSource.initialize().then(ds=>ds.showMigrations().then(p=>{console.log('Pending:',p); ds.destroy()}))\"",
     "migration:revert": "tsx src/data-source.ts migration:revert"
   },

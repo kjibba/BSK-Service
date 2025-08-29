@@ -408,6 +408,11 @@ function Inner({ visitId }){
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8}}>
           <div>
             <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>
+            {data?.customer?.id ? (
+              <div style={{fontSize:13}}>
+                Kunde: <a href={`#customer:${data.customer.id}`}>{data.customer.name || `#${data.customer.id}`}</a>
+              </div>
+            ) : null}
             <div style={{fontSize:13, color:'#475569'}}>Status: {v.status || 'Planlagt'}</div>
           </div>
           <div style={{display:'flex', gap:8}}>

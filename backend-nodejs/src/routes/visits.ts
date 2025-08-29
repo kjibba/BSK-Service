@@ -5,6 +5,7 @@ import { Customer } from "../entities/Customer";
 import { ServiceLog } from "../entities/ServiceLog";
 import { Employee } from "../entities/Employee";
 import { Equipment } from "../entities/Equipment";
+import { MaterialUsage } from "../entities/MaterialUsage";
 import { In } from "typeorm";
 import { requireJwt, requireAdmin } from "./auth";
 import path from "path";
@@ -266,7 +267,14 @@ router.get("/:id/detail", async (req, res) => {
     }
     const logObjs = logs.map(l => ({ ...l.toDict(), equipment_name: names.get(l.equipmentId) }));
 
-    res.json({ visit: visit.toDict(), customer: visit.customer?.toDict?.() || undefined, logs: logObjs });
+    // Also include all equipment for the customer so VisitDetail can show map/list
+    const custEquip = await equipRepo.find({ where: { customerId: visit.customerId }, relations: ["equipmentType"] });
+    const equipObjs = custEquip.map(e => ({
+      ...e.toDict(),
+      equipment_type_name: (e as any).equipmentType?.name || undefined,
+    }));
+
+    res.json({ visit: visit.toDict(), customer: visit.customer?.toDict?.() || undefined, logs: logObjs, equipment: equipObjs });
   } catch (error) {
     console.error("Error fetching visit detail:", error);
     res.status(500).json({ error: "Failed to fetch visit detail" });

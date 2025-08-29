@@ -31,6 +31,10 @@ export default function EquipmentTypesManager() {
   return (
     <div>
       <Card title="Utstyrstyper">
+        <p style={{marginTop:0, color:'#475569', fontSize:13}}>
+          Felter beskriver hvilke data som registreres ved service. Eksempler:
+          «Åtekasse» kan ha feltene Forbruk giftåte (%), Benyttet giftåte (valg), Giftåte etterfylt (gram), Benyttet giftfritt åte (valg), Giftfritt etterfylt (gram).
+        </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <Button onClick={() => setEditing({ name: '', fields: [] })}>Ny type</Button>
           <Button onClick={() => load()}>Oppdater</Button>
@@ -46,6 +50,10 @@ export default function EquipmentTypesManager() {
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <Button size="sm" onClick={() => setEditing(it)}>Endre</Button>
+                  <Button size="sm" variant="danger" onClick={async ()=>{
+                    if (!window.confirm(`Slette utstyrstype '${it.name}'?`)) return
+                    try { await EquipmentTypesAPI.delete(it.id); await load() } catch {}
+                  }}>Slett</Button>
                 </div>
               </li>
             ))}

@@ -23,6 +23,10 @@ export class Employee {
   @Column({ type: "boolean", default: true })
   active?: boolean;
 
+  // Store bcrypt hash; never expose in API
+  @Column({ type: "varchar", length: 255, name: "password_hash", nullable: true })
+  passwordHash?: string | null;
+
   toDict() {
     return {
       id: this.id,

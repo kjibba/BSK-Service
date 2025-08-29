@@ -22,6 +22,12 @@ api.interceptors.response.use(
         const description = `${title} ved ${url}: ${detailMsg}`
         window.dispatchEvent(new CustomEvent('app:toast', { detail: { variant, title, description, timeout: 5000 } }))
       }
+      // If unauthorized, force redirect to login and avoid showing stale content
+      if (status === 401) {
+        try { sessionStorage.setItem('post-login-redirect', window.location.hash || '#customers') } catch {}
+        try { if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k))) } catch {}
+        window.location.hash = 'login'
+      }
     } catch (_) { /* no-op */ }
     return Promise.reject(error)
   }
@@ -92,7 +98,7 @@ export const MapAPI = {
 }
 
 export const AuthAPI = {
-  login: (email) => api.post('/auth/login', { email }).then(r => r.data),
+  login: (email, password) => api.post('/auth/login', { email, password }).then(r => r.data),
   logout: () => api.post('/auth/logout').then(r => r.data),
   whoami: () => api.get('/auth/whoami').then(r => r.data),
 }

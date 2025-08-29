@@ -12,8 +12,8 @@ export function AuthProvider({ children }){
     }).finally(() => setReady(true))
   }, [])
 
-  const login = async (email) => {
-    const d = await AuthAPI.login(email)
+  const login = async (email, password) => {
+    const d = await AuthAPI.login(email, password)
     // Prefer server's user info if role included; otherwise fetch whoami to populate role
     if (d && d.user && typeof d.user === 'object' && 'role' in d.user) {
       setUser(d.user)

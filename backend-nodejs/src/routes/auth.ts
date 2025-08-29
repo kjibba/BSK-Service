@@ -2,6 +2,7 @@ import express from "express";
 import { AppDataSource } from "../data-source";
 import { Employee } from "../entities/Employee";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ declare module "express-session" {
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   try {
-    const { email } = req.body;
+  const { email, password } = req.body;
     
     if (!email) {
       return res.status(400).json({ error: "email required" });
@@ -31,7 +32,7 @@ router.post("/login", async (req, res) => {
     // Use a core-column-only query to be resilient if schema migrations are pending
     const row = await AppDataSource
       .createQueryBuilder()
-      .select(["e.id", "e.name", "e.email", "e.role"])
+      .select(["e.id", "e.name", "e.email", "e.role", "e.password_hash"])
       .from(Employee, "e")
       .where("LOWER(e.email) = :email", { email: lowered })
       .getRawOne();
@@ -40,6 +41,16 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ 
         error: "Ukjent e-post. Kontakt administrator for tilgang." 
       });
+    }
+
+    // If user has a password_hash set, require correct password; else allow legacy email-only login
+    const dbHash = row.e_password_hash ?? row.password_hash;
+    if (dbHash) {
+      if (!password || typeof password !== 'string' || password.length < 1) {
+        return res.status(401).json({ error: "Passord kreves for denne brukeren" });
+      }
+      const ok = await bcrypt.compare(password, dbHash);
+      if (!ok) return res.status(401).json({ error: "Ugyldig e-post eller passord" });
     }
 
     // Set session
