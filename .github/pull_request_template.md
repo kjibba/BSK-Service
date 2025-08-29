@@ -1,3 +1,19 @@
+## Beskrivelse
+- Hva endres og hvorfor?
+
+## Sjekkliste
+- [ ] Bygg og lint passer lokalt
+- [ ] Ingen breaking changes uten feature flag (VITE_ENABLE_NEW_UI)
+- [ ] Tilgjengelighet: fokus, kontrast, ARIA
+- [ ] Ytelse: lazy loading, 60fps interaksjoner, skeletons
+- [ ] Mobilvennlig: 48px touch-mål, én-håndsbruk, sticky actions
+- [ ] Dokumentasjon oppdatert (README/CHANGELOG)
+
+## Testing
+- [ ] Manuell test: Hjem, Kart, Kunder, Meg
+- [ ] E2E/smoke: /health 200 via nginx og backend
+
+## Screenshots / Demo
 ## Hva
 
 Kort beskrivelse av endringen(e).
