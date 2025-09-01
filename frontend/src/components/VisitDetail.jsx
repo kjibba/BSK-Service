@@ -11,6 +11,7 @@ import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
 import FeedbackButton from './FeedbackButton'
 import ActionBar from './ui/ActionBar'
+import Fab from './ui/Fab'
 
 export default function VisitDetail({ visitId }){
   return (
@@ -723,6 +724,15 @@ function Inner({ visitId }){
             )}
           </div>
         </ActionBar>
+      )}
+
+      {/* Contextuell FAB på mobil: Start/Fullfør besøk */}
+      {enableNewUi && isMobile && (
+        canStart ? (
+          <Fab label="Start besøk" icon="▶" ariaLabel="Start besøk" onClick={start} />
+        ) : canComplete ? (
+          <Fab label="Fullfør besøk" icon="✓" ariaLabel="Fullfør besøk" onClick={complete} />
+        ) : null
       )}
     </div>
   )

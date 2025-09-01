@@ -83,3 +83,8 @@
   - Fjernet tomme/feilaktige filer: `docker-compose.override.yml` og `docker-compose.nodejs.yml` (ikke i bruk).
   - Lagt til enkel `docker-compose.prod.yml` som extender base `docker-compose.yml` (kun 80/443 i prod, og samme backend-oppsett via miljøvariabler).
   - `scripts/deploy_to_nas.ps1` kan fortsatt peke til `docker-compose.prod.yml`.
+
+14) Mobil UX: Kontekstuelle FABs (2025-09-01)
+  - VisitDetail: viser flytende knapp nederst til høyre med «Start besøk» (planlagt) eller «Fullfør besøk» (pågående) når ny UI er aktiv og skjermen er smal.
+  - CustomerDetail: viser flytende knapp «Opprett besøk» for admin/manager når kunden ikke har aktivt besøk; knappen toggler inline-skjema.
+  - Dette gjør de viktigste handlingene lettere tilgjengelige på mobil uten å lete i skjermbildet.

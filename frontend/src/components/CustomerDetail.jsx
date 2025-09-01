@@ -10,6 +10,7 @@ import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
 import { useToast } from './ui/Toast.jsx'
 import { useAuth } from './hooks/useAuth'
+import Fab from './ui/Fab'
 
 export default function CustomerDetail({ customerId }) {
   const { user } = useAuth()
@@ -97,6 +98,17 @@ export default function CustomerDetail({ customerId }) {
 
   // Active visit for this customer, available to effects and render
   const activeVisit = (data?.visits || []).find(v => v.status === 'Pågående')
+  const [isMobile, setIsMobile] = useState(() => {
+    try { return window.matchMedia && window.matchMedia('(max-width: 900px)').matches } catch { return false }
+  })
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 900px)')
+      const onChange = () => setIsMobile(mq.matches)
+      mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange)
+      return () => { mq.removeEventListener ? mq.removeEventListener('change', onChange) : mq.removeListener(onChange) }
+    } catch {}
+  }, [])
 
   // initialize map once
   useEffect(() => {
@@ -988,6 +1000,16 @@ export default function CustomerDetail({ customerId }) {
       <div>
         <Button onClick={() => window.history.back()}>Tilbake</Button>
       </div>
+
+      {/* Contextuell FAB på mobil: Opprett besøk når ingen aktive */}
+      {isMobile && !activeVisit && isAdmin && (
+        <Fab
+          label={creatingVisit ? 'Lukk' : 'Opprett besøk'}
+          icon={creatingVisit ? '✕' : '+'}
+          ariaLabel="Opprett nytt besøk"
+          onClick={() => setCreatingVisit(v => !v)}
+        />
+      )}
     </div>
   )
 }
