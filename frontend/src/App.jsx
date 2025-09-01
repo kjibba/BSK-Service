@@ -7,7 +7,7 @@ import ErrorBoundary from './components/Boundary.jsx'
 import FeedbackButton from './components/FeedbackButton.jsx'
 import Fab from './components/ui/Fab.jsx'
 import BottomSheet from './components/ui/BottomSheet.jsx'
-import { VisitsAPI, RouteChoicesAPI } from './api'
+import { VisitsAPI, RouteChoicesAPI, CustomersAPI } from './api'
 
 // Lazy-load pages/components that are relatively heavy
 const CustomerList = lazy(() => import('./components/CustomerList.jsx'))
@@ -257,9 +257,9 @@ function App() {
     <div className="bottom-tabbar">
         <div className="container inner">
           <a className={`tab-btn ${isHome ? 'active' : ''}`} href="#home">Hjem</a>
-          <a className={`tab-btn ${(!isMap && !isMissions && !isVisit && !isHome) ? 'active' : ''}`} href="#customers">Kunder</a>
+          <a className={`tab-btn ${(!isMap && !isMissions && !isVisit && !isHome) ? 'active' : ''}`} href="#customers" onMouseEnter={()=> CustomersAPI.prefetch({ include: 'next_visit', sort: 'next' })} onFocus={()=> CustomersAPI.prefetch({ include: 'next_visit', sort: 'next' })}>Kunder</a>
           <a className={`tab-btn ${isMap ? 'active' : ''}`} href="#map">Kart</a>
-          <a className={`tab-btn ${isMissions ? 'active' : ''}`} href="#missions">Mine oppdrag</a>
+          <a className={`tab-btn ${isMissions ? 'active' : ''}`} href="#missions" onMouseEnter={()=> VisitsAPI.prefetch()} onFocus={()=> VisitsAPI.prefetch()}>Mine oppdrag</a>
           <button className="tab-btn" type="button" aria-label="Send tilbakemelding" onClick={()=> setFeedbackOpen(v => !v)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
               <path d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>

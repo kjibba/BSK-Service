@@ -6,6 +6,7 @@ import Button from './ui/Button'
 import { IconRefresh } from './ui/icons'
 import PageHeader from './ui/PageHeader'
 import { Loading, Empty } from './ui/States'
+import { ListSkeleton } from './ui/Skeleton'
 
 export default function MyMissions(){
   return (
@@ -32,7 +33,9 @@ function AssignRow({ visit, emps, onAssign }){
 
 function Inner(){
   const { user } = useAuth()
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => {
+    try { return VisitsAPI._getCache('my:{}') || [] } catch { return [] }
+  })
   const [loading, setLoading] = useState(true)
   const [emps, setEmps] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -75,7 +78,12 @@ function Inner(){
     window.location.hash = `visit:${id}`
   }
 
-  if (loading) return <Loading>Laster oppdrag…</Loading>
+  if (loading && items.length === 0) return (
+    <div>
+      <PageHeader title="Mine oppdrag" />
+      <ListSkeleton rows={8} />
+    </div>
+  )
   if (!items.length) return <Empty>Ingen planlagte besøk.</Empty>
 
   return (

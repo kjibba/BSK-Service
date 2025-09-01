@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CustomersAPI } from '../api';
 import { Loading, ErrorState } from './ui/States';
+import { ListSkeleton } from './ui/Skeleton';
 import { RequireAuth } from './auth';
 import PageHeader from './ui/PageHeader';
 import { IconRefresh, IconPlus } from './ui/icons';
@@ -18,7 +19,13 @@ const statusFor = (nextVisitIso) => {
 };
 
 const CustomerList = () => {
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState(() => {
+    // Attempt warm start from API cache (same default params)
+    try {
+      const cached = CustomersAPI._getCache(JSON.stringify({ include: 'next_visit', sort: 'next' }))
+      return cached || []
+    } catch { return [] }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortMode, setSortMode] = useState('next'); // 'next' | 'alpha'
@@ -111,7 +118,7 @@ const CustomerList = () => {
 
         <div className="customer-list" id="customer-list">
           {loading && customers.length === 0 ? (
-            <Loading />
+            <ListSkeleton rows={10} />
           ) : customers.length === 0 ? (
             <div style={{opacity:.7}}>
               {searchTerm ? `Ingen treff for '${searchTerm}'.` : 'Ingen kunder å vise.'}

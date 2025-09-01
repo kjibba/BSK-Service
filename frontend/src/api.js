@@ -64,7 +64,19 @@ try {
 } catch (_) { /* no-op */ }
 
 export const CustomersAPI = {
-  list: (params) => api.get('/customers', { params }).then(r => r.data),
+  _cache: new Map(),
+  _setCache(key, data){ try { this._cache.set(key, { t: Date.now(), data }) } catch {} },
+  _getCache(key){ try { return this._cache.get(key)?.data } catch { return undefined } },
+  prefetch(params){
+    const key = JSON.stringify(params || {})
+    return api.get('/customers', { params }).then(r => { this._setCache(key, r.data); return r.data })
+  },
+  list: (params) => {
+    const key = JSON.stringify(params || {})
+    const cached = CustomersAPI._getCache(key)
+    if (cached) return Promise.resolve(cached)
+    return api.get('/customers', { params }).then(r => { CustomersAPI._setCache(key, r.data); return r.data })
+  },
   create: (payload) => api.post('/customers', payload).then(r => r.data),
   update: (id, payload) => api.put(`/customers/${id}`, payload).then(r => r.data),
   fixGeo: (id, lat, lng) => api.post(`/customers/${id}/fix-geo`, { latitude: lat, longitude: lng }).then(r => r.data),
@@ -83,9 +95,26 @@ export const EquipmentAPI = {
 }
 
 export const VisitsAPI = {
-  list: (params) => api.get('/visits', { params }).then(r => r.data),
+  _cache: new Map(),
+  _setCache(key, data){ try { this._cache.set(key, { t: Date.now(), data }) } catch {} },
+  _getCache(key){ try { return this._cache.get(key)?.data } catch { return undefined } },
+  prefetch(params){
+    const key = `list:${JSON.stringify(params||{})}`
+    return api.get('/visits', { params }).then(r => { this._setCache(key, r.data); return r.data })
+  },
+  list: (params) => {
+    const key = `list:${JSON.stringify(params||{})}`
+    const cached = VisitsAPI._getCache(key)
+    if (cached) return Promise.resolve(cached)
+    return api.get('/visits', { params }).then(r => { VisitsAPI._setCache(key, r.data); return r.data })
+  },
   create: (payload) => api.post('/visits', payload).then(r => r.data),
-  myMissions: (overrides) => api.get('/visits/my_missions', { params: overrides }).then(r => r.data),
+  myMissions: (overrides) => {
+    const key = `my:${JSON.stringify(overrides||{})}`
+    const cached = VisitsAPI._getCache(key)
+    if (cached) return Promise.resolve(cached)
+    return api.get('/visits/my_missions', { params: overrides }).then(r => { VisitsAPI._setCache(key, r.data); return r.data })
+  },
   detail: (id) => api.get(`/visits/${id}/detail`).then(r => r.data),
   start: (id, overrides) => api.post(`/visits/${id}/start`, null, { params: overrides }).then(r => r.data),
   logs: {

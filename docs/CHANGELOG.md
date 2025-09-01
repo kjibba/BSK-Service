@@ -92,3 +92,9 @@
 15) Migrasjoner: valgfri auto-kjøring ved oppstart (2025-09-01)
   - Backend kjører nå migrasjoner ved oppstart dersom `DB_RUN_MIGRATIONS=true` i miljøet. Default er av.
   - `docker-compose.yml` eksponerer `DB_RUN_MIGRATIONS` slik at dette kan toggles ved behov (f.eks. ved førstegangsoppsett).
+
+16) Prefetch + skeletons, enkel CI og a11y-justering (2025-09-01)
+  - Frontend: Lette «skeleton»-lister lagt til for Kunder og Mine oppdrag for raskere opplevd last.
+  - Frontend: Prefetch ved hover/fokus på bunnfaner («Kunder», «Mine oppdrag») som varmer API-cache og gjør navigasjonen snappier.
+  - Frontend: Forbedret fokusstyring i BottomSheet (fokus settes ved åpning, gjenopprettes ved lukking).
+  - CI: Ny GitHub Actions workflow (`.github/workflows/ci.yml`) som bygger backend (TypeScript) og frontend (Vite) på push/PR.

@@ -11,6 +11,8 @@ import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
 import FeedbackButton from './FeedbackButton'
 import ActionBar from './ui/ActionBar'
+import PageHeader from './ui/PageHeader'
+import { IconRefresh } from './ui/icons'
 import Fab from './ui/Fab'
 
 export default function VisitDetail({ visitId }){
@@ -430,8 +432,17 @@ function Inner({ visitId }){
 
   return (
     <div className="stack" style={{gap:16}}>
+      <PageHeader
+        title={`Besøksdetalj${v?.id ? ` #${v.id}` : ''}`}
+        actions={(
+          <>
+            <button className="btn btn-icon" onClick={() => load({ silent: false })}><IconRefresh /> Oppdater</button>
+            <button className="btn" onClick={() => window.history.back()}>Tilbake</button>
+          </>
+        )}
+      />
   <FeedbackButton context={{ page: 'visit', visitId }} />
-      <Card title="Besøksdetalj">
+  <Card title="Besøksdetalj">
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8}}>
           <div>
             <div>Besøk #{v.id} — {new Date(v.visit_date).toLocaleString()}</div>

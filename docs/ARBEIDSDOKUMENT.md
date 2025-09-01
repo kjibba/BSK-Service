@@ -20,7 +20,7 @@ Dette er et «levende» dokument for plan, status og neste steg. Hold sjekkliste
 - [x] Ekstern dev-DB via .env-override; DB_SYNC=false i dev
 - [x] Health-ender: /health (backend) via Nginx
 - [ ] Prod-SSL med Certbot (sjekk fornying og reload-rutine)
-- [ ] CI: enkel build-sjekk (frontend+backend) ved PR
+- [x] CI: enkel build-sjekk (frontend+backend) ved PR
 
 ### 2) Backend (Node/Express/TypeORM)
 - [x] trust proxy aktivert for riktig cookie-oppførsel
@@ -34,17 +34,17 @@ Dette er et «levende» dokument for plan, status og neste steg. Hold sjekkliste
 - [x] PageHeader-komponent i hovedvisninger
 - [x] «Oppdater»-handling i headere, kompakt .btn-icon-stil
 - [x] Delt ikonsett (Refresh/Plus/Back/ChevronUp/Down/Edit)
-- [ ] PageHeader også i VisitDetail (hvis ikke allerede)
+- [x] PageHeader også i VisitDetail (hvis ikke allerede)
 
 ### 4) Frontend – mobil arbeidsflyt (pågående)
 - [x] Hjem-fane: FAB «Start neste besøk» åpner bunnark «Rask start» med neste planlagte besøk og handlinger (åpne/start)
-- [ ] Kontekstuell FAB:
-  - [ ] VisitDetail: FAB «Start/Fullfør» basert på status
-  - [ ] CustomerDetail: FAB «Opprett besøk»
+- [x] Kontekstuell FAB:
+  - [x] VisitDetail: FAB «Start/Fullfør» basert på status
+  - [x] CustomerDetail: FAB «Opprett besøk»
 - [x] Forberedt MapView → BottomSheet: globalt event `app:openSheet` (feature-flagget) for å åpne kundedetalj i bunnark uten endring av popup-klasser
-- [ ] Prefetch og lette skeletons for hovedlister
+- [x] Prefetch og lette skeletons for hovedlister
 - [ ] Enkle offline-forbedringer (service worker + idb) – lav prioritet
-- [ ] WCAG/tilgjengelighet: fokusrekkefølge, label-for, kontrast
+- [ ] WCAG/tilgjengelighet: fokusrekkefølge, label-for, kontrast (pågår – fokus forbedret i BottomSheet)
 
 ### 5) Kvalitet & test
 - [x] Manuell smoketest-rutine (dev): app opp, login, kart, lister, detaljer
@@ -53,7 +53,8 @@ Dette er et «levende» dokument for plan, status og neste steg. Hold sjekkliste
 
 ### 6) Database & migrasjoner (ekstern dev-DB)
 - [ ] Gi `bsk_user` nødvendige rettigheter for migrasjoner (kjør `scripts/grant_extdb.sql` som root)
-- [ ] Kjør migrasjoner mot ekstern DB: `docker compose run --rm backend node dist/run-migrations.js`
+- [x] Kjør migrasjoner mot ekstern DB: `docker compose run --rm backend node dist/run-migrations.js`
+  - [x] Verifisert: ingen pending migrasjoner (auto-run ved oppstart ga «pending: false»)
 - [ ] Hvis låst/uten rettigheter: manuell én-gangs kolonne-fix i HeidiSQL
   - [ ] `ALTER TABLE customers ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1;`
   - [ ] `ALTER TABLE employees ADD COLUMN password_hash VARCHAR(255) NULL;`
