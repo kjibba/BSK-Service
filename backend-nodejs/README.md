@@ -58,9 +58,20 @@ All endpoints maintain identical request/response formats to ensure the React fr
 - **Production:** Compiles to JavaScript and runs with Node.js
 - **Docker:** Full containerization support with docker-compose
 
+### Migrations
+
+- Kjør migrasjoner manuelt i dev/prod:
+   - `npm run build`
+   - `npm run migration:run`
+- Eller la backend kjøre migrasjoner ved oppstart når eksplisitt skrudd på:
+   - Sett `DB_RUN_MIGRATIONS=true` i miljøvariabler (compose støtter dette via `environment`).
+   - Dette er av som standard, og feiler ikke serverstart ved migrasjonsfeil.
+
 ## Environment Variables
 
 See `.env.example` for required configuration including database connection and session secrets.
+Ekstra:
+- `DB_RUN_MIGRATIONS` (default: false) — kjør TypeORM-migrasjoner ved oppstart.
 
 ## Next Steps
 

@@ -165,6 +165,24 @@ async function startServer() {
     await AppDataSource.initialize();
     console.log("Database connection established");
 
+    // Optionally run pending migrations on startup when explicitly enabled
+    try {
+      const runMigs = String(process.env.DB_RUN_MIGRATIONS || 'false').toLowerCase() === 'true'
+      if (runMigs) {
+        const pending = await AppDataSource.showMigrations()
+        console.log('DB_RUN_MIGRATIONS=true → pending:', pending)
+        if (pending) {
+          const executed = await AppDataSource.runMigrations()
+          console.log('Executed migrations on startup:', executed.map(m => m.name))
+        } else {
+          console.log('No migrations to run on startup.')
+        }
+      }
+    } catch (e) {
+      console.error('Auto-migration on startup failed:', e)
+      // Do not crash server; migrations can be run separately
+    }
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${NODE_ENV}`);

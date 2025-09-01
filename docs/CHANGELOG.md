@@ -88,3 +88,7 @@
   - VisitDetail: viser flytende knapp nederst til høyre med «Start besøk» (planlagt) eller «Fullfør besøk» (pågående) når ny UI er aktiv og skjermen er smal.
   - CustomerDetail: viser flytende knapp «Opprett besøk» for admin/manager når kunden ikke har aktivt besøk; knappen toggler inline-skjema.
   - Dette gjør de viktigste handlingene lettere tilgjengelige på mobil uten å lete i skjermbildet.
+
+15) Migrasjoner: valgfri auto-kjøring ved oppstart (2025-09-01)
+  - Backend kjører nå migrasjoner ved oppstart dersom `DB_RUN_MIGRATIONS=true` i miljøet. Default er av.
+  - `docker-compose.yml` eksponerer `DB_RUN_MIGRATIONS` slik at dette kan toggles ved behov (f.eks. ved førstegangsoppsett).

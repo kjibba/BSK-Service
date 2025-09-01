@@ -24,16 +24,17 @@ services:
     container_name: bsk_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      PORT: ${BACKEND_PORT:-8000}
+      NODE_ENV: "production"
+      PORT: "${BACKEND_PORT:-8000}"
       # Ekstern MariaDB på lokal maskin
-      DB_HOST: ${DB_HOST:-host.docker.internal}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE: ${DB_DATABASE}
-      DB_SYNC: ${DB_SYNC:-false}
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      DB_HOST: "${DB_HOST:-host.docker.internal}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_USERNAME: "${DB_USERNAME}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_DATABASE: "${DB_DATABASE}"
+      DB_SYNC: "${DB_SYNC:-false}"
+      DB_RUN_MIGRATIONS: "${DB_RUN_MIGRATIONS:-false}"
+      ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
     volumes:
       - backend_static:/app/static
     expose:
