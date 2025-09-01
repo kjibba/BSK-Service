@@ -78,3 +78,8 @@
   - Oppdatert/forbedret `.gitignore` for å ignorere byggeartefakter, venv og uploads.
   - Fjernet tidligere sporede filer i `backend/venv2/` fra git-indeksen (beholdt på disk) for å unngå støy og advarsler.
   - Effekt: `git status` blir ryddigere, og commits inkluderer kun relevante kildefiler.
+
+13) Compose-opprydding (2025-09-01)
+  - Fjernet tomme/feilaktige filer: `docker-compose.override.yml` og `docker-compose.nodejs.yml` (ikke i bruk).
+  - Lagt til enkel `docker-compose.prod.yml` som extender base `docker-compose.yml` (kun 80/443 i prod, og samme backend-oppsett via miljøvariabler).
+  - `scripts/deploy_to_nas.ps1` kan fortsatt peke til `docker-compose.prod.yml`.
