@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
 import FeedbackButton from './FeedbackButton'
+import ActionBar from './ui/ActionBar'
 
 export default function VisitDetail({ visitId }){
   return (
@@ -27,6 +28,8 @@ function Inner({ visitId }){
   const [logForm, setLogForm] = useState({ equipment_id: '', description: '', hours_worked: '' })
   const [summary, setSummary] = useState('')
   const [checklist, setChecklist] = useState({ sjekk_advarselskilt: false, sjekk_agnstasjoner: false, sjekk_inngangspunkter: false, sjekk_fellefangst: false })
+  const [signatures, setSignatures] = useState({ customer_signature_url: '', technician_signature_url: '' })
+  const fileToDataUrl = async (file) => new Promise((resolve, reject) => { try { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file) } catch (e) { reject(e) } })
   const [types, setTypes] = useState([])
   const [showLogModal, setShowLogModal] = useState(false)
   const [selectedEq, setSelectedEq] = useState(null)
@@ -35,6 +38,18 @@ function Inner({ visitId }){
   const [editingLog, setEditingLog] = useState(null)
   const [savingLog, setSavingLog] = useState(false)
   const [mapsKeyMissing, setMapsKeyMissing] = useState(false)
+  const enableNewUi = (import.meta && import.meta.env && import.meta.env.VITE_ENABLE_NEW_UI) === 'true'
+  const [isMobile, setIsMobile] = useState(() => {
+    try { return window.matchMedia && window.matchMedia('(max-width: 900px)').matches } catch { return false }
+  })
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 900px)')
+      const onChange = () => setIsMobile(mq.matches)
+      mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange)
+      return () => { mq.removeEventListener ? mq.removeEventListener('change', onChange) : mq.removeListener(onChange) }
+    } catch {}
+  }, [])
 
   const extractNote = useCallback((text) => {
     try {
@@ -97,6 +112,10 @@ function Inner({ visitId }){
       const d = await VisitsAPI.detail(visitId)
       setData(d)
       setSummary(d?.visit?.oppsummering_notat || '')
+      setSignatures({
+        customer_signature_url: d?.visit?.customer_signature_url || '',
+        technician_signature_url: d?.visit?.technician_signature_url || '',
+      })
       setChecklist({
         sjekk_advarselskilt: !!d?.visit?.sjekk_advarselskilt,
         sjekk_agnstasjoner: !!d?.visit?.sjekk_agnstasjoner,
@@ -382,7 +401,14 @@ function Inner({ visitId }){
       if (!ok2) return
     }
     try {
-      await VisitsAPI.complete(visitId, { summary, checklist })
+      // Persist signature URLs (if changed) before completion
+      try {
+        await VisitsAPI.update?.(visitId, {
+          customer_signature_url: signatures.customer_signature_url || undefined,
+          technician_signature_url: signatures.technician_signature_url || undefined,
+        })
+      } catch (_) { /* non-fatal */ }
+  await VisitsAPI.complete(visitId, { summary, checklist })
       toast.push({ variant: 'success', title: 'Besøk fullført' })
       window.location.hash = 'missions'
     } catch (e) {
@@ -454,6 +480,56 @@ function Inner({ visitId }){
 
       <Card title="Oppsummering og sjekkliste">
         <textarea className="input" placeholder="Oppsummering til kunde" value={summary} onChange={e=> setSummary(e.target.value)} />
+        <div className="stack" style={{ gap: 8, marginTop: 8 }}>
+          <div style={{ fontWeight: 600 }}>Signaturer</div>
+          <div className="stack" style={{ gap: 6 }}>
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <input className="input" placeholder="Kundesignatur URL (valgfritt)" value={signatures.customer_signature_url} onChange={e=> setSignatures(s=> ({...s, customer_signature_url: e.target.value}))} style={{ flex: 1, minWidth:220 }} />
+              <label className="btn">
+                Last opp
+                <input type="file" accept="image/*" style={{ display:'none' }} onChange={async (ev) => {
+                  try {
+                    const f = ev.target.files && ev.target.files[0]; if (!f) return
+                    const dataUrl = await fileToDataUrl(f)
+                    setSignatures(s => ({ ...s, customer_signature_url: String(dataUrl||'') }))
+                  } catch {}
+                }} />
+              </label>
+            </div>
+            {signatures.customer_signature_url ? (
+              <div style={{ fontSize: 12, color:'#64748b' }}>
+                Forhåndsvisning:
+                <div style={{ marginTop:6 }}>
+                  <img src={signatures.customer_signature_url} alt="Kundesignatur" style={{ maxWidth: 240, borderRadius: 6, border:'1px solid #e2e8f0' }} />
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="stack" style={{ gap: 6 }}>
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <input className="input" placeholder="Teknikersignatur URL (valgfritt)" value={signatures.technician_signature_url} onChange={e=> setSignatures(s=> ({...s, technician_signature_url: e.target.value}))} style={{ flex: 1, minWidth:220 }} />
+              <label className="btn">
+                Last opp
+                <input type="file" accept="image/*" style={{ display:'none' }} onChange={async (ev) => {
+                  try {
+                    const f = ev.target.files && ev.target.files[0]; if (!f) return
+                    const dataUrl = await fileToDataUrl(f)
+                    setSignatures(s => ({ ...s, technician_signature_url: String(dataUrl||'') }))
+                  } catch {}
+                }} />
+              </label>
+            </div>
+            {signatures.technician_signature_url ? (
+              <div style={{ fontSize: 12, color:'#64748b' }}>
+                Forhåndsvisning:
+                <div style={{ marginTop:6 }}>
+                  <img src={signatures.technician_signature_url} alt="Teknikersignatur" style={{ maxWidth: 240, borderRadius: 6, border:'1px solid #e2e8f0' }} />
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>Du kan lime inn URL eller laste opp bilde direkte. Ved opplasting lagres bildet i systemet og feltet for URL settes automatisk.</div>
+        </div>
         <div className="list" style={{marginTop:8}}>
           {Object.keys(checklist).map(k => (
             <label key={k} className="list-item" style={{gap:8}}>
@@ -607,6 +683,46 @@ function Inner({ visitId }){
             </form>
           </div>
         </div>
+      )}
+      {/* Sticky action bar on mobile (feature-flagged) */}
+      {enableNewUi && isMobile && (
+        <ActionBar visible>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ fontWeight: 600 }}>Besøk #{v.id} — {new Date(v.visit_date).toLocaleDateString()}</div>
+            {data?.customer?.id ? (
+              <a className="btn btn-ghost" href={`#customer:${data.customer.id}`}>Kundekort</a>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems:'center' }}>
+            {canStart && <Button variant="primary" onClick={start}>Start</Button>}
+            {canComplete && <Button variant="success" onClick={complete}>Fullfør</Button>}
+            {/* Overflow for secondary actions */}
+            {(canDelete) && (
+              <div className="dropdown" style={{ position:'relative' }}>
+                <details>
+                  <summary className="btn">Mer</summary>
+                  <div className="card" style={{ position:'absolute', right:0, bottom:'100%', marginBottom:6, minWidth:160, padding:6 }}>
+                    <button
+                      className="btn"
+                      onClick={async () => {
+                        try {
+                          if (!window.confirm('Slette dette oppdraget?')) return
+                          await VisitsAPI.delete(visitId)
+                          toast.push({ variant:'success', title:'Slettet', description:'Oppdraget ble slettet.' })
+                          const cid = data?.customer?.id
+                          window.location.hash = cid ? `customer:${cid}` : 'missions'
+                        } catch (e) {
+                          const msg = e?.response?.data?.error || e?.message || 'Kunne ikke slette oppdrag'
+                          toast.push({ variant:'error', title:'Sletting feilet', description: String(msg) })
+                        }
+                      }}
+                    >Slett oppdrag</button>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+        </ActionBar>
       )}
     </div>
   )

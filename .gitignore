@@ -1,38 +1,83 @@
+########################################
+# OS / editor files
+########################################
+.DS_Store
+Thumbs.db
+.idea/
+
+########################################
+# Logs
+########################################
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+########################################
+# Node / builds
+########################################
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/http-server.pid
+frontend/.env.local
+
+# Backend Node build & runtime uploads
+backend-nodejs/dist/
+backend-nodejs/static/uploads/
+!backend-nodejs/static/uploads/.gitkeep
+
+# Legacy Flask backend uploads (ignore media)
+backend/static/uploads/
+!backend/static/uploads/.gitkeep
+
+# Nginx Let's Encrypt certs (local/dev)
+nginx/letsencrypt/
+
+########################################
 # Python
+########################################
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-.env
-.env.local
+
+# Virtual envs
 .venv/
 .venv*/
 venv/
 venv*/
-
-# Virtualenvs inside repo
 backend/venv2/
-.venv/
 
-# Node
-node_modules/
-dist/
-build/
+########################################
+# Env files
+########################################
+.env
+.env.*
 
-# Vite / frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.env.local
+########################################
+# VS Code
+########################################
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
-# IDEs
-.vscode/
-.idea/
+########################################
+# Coverage / reports
+########################################
+coverage/
+.nyc_output/
 
-# OS
-Thumbs.db
-.DS_Store
-
+########################################
 # DB / exports / backups
+########################################
 *.sqlite3
 *.db
 *.sql

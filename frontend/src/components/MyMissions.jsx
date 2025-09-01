@@ -3,6 +3,8 @@ import { VisitsAPI, EmployeesAPI } from '../api'
 import { RequireAuth } from './auth'
 import { useAuth } from './hooks/useAuth'
 import Button from './ui/Button'
+import { IconRefresh } from './ui/icons'
+import PageHeader from './ui/PageHeader'
 import { Loading, Empty } from './ui/States'
 
 export default function MyMissions(){
@@ -16,8 +18,8 @@ export default function MyMissions(){
 function AssignRow({ visit, emps, onAssign }){
   const [tid, setTid] = useState(visit.assigned_technician_id || '')
   return (
-    <div style={{display:'flex', gap:8, alignItems:'center', marginTop:6}}>
-      <select className="input" value={tid} onChange={e=> setTid(e.target.value)} style={{minWidth:320}}>
+    <div className="assign-row" style={{display:'flex', gap:8, alignItems:'center', marginTop:6, flexWrap:'wrap'}}>
+      <select className="input" value={tid} onChange={e=> setTid(e.target.value)} style={{minWidth:220, flex:'1 1 220px'}}>
         <option value="">Velg tekniker…</option>
         {emps.map(e => (
           <option key={e.id} value={e.id}>{e.name || e.email}</option>
@@ -78,24 +80,21 @@ function Inner(){
 
   return (
     <div>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'8px 0 12px', gap: 12}}>
-        <h1 style={{margin:0}}>Mine oppdrag</h1>
-        <div style={{display:'flex', alignItems:'center', gap:8}}>
-          <input
-            type="search"
-            aria-label="Søk oppdrag"
-            placeholder="Søk (kunde, adresse eller id)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{padding:'8px 10px', borderRadius:6, border:'1px solid #ccc', width:320}}
-          />
-          {searchTerm && <button className="btn" onClick={() => setSearchTerm('')}>Tøm</button>}
-          <button className="btn" onClick={() => load()}>Oppdater</button>
-        </div>
-      </div>
-      <div className="list">
+  <PageHeader title="Mine oppdrag" actions={<button className="btn btn-icon" onClick={() => load()}><IconRefresh /> Oppdater</button>}>
+        <input
+          className="search-input"
+          type="search"
+          aria-label="Søk oppdrag"
+          placeholder="Søk (kunde, adresse eller id)..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid #ccc', width: '100%', maxWidth: 540 }}
+        />
+  {searchTerm && <button className="btn btn-ghost btn-icon" onClick={() => setSearchTerm('')}>Tøm</button>}
+      </PageHeader>
+      <div className="missions-list list">
       {items.map(v => (
-        <div key={v.id} className="list-item">
+        <div key={v.id} className="list-item mission">
           <div>
             <div><strong>Besøk #{v.id}</strong> — {new Date(v.visit_date).toLocaleString()}</div>
             {v.customer_id ? (

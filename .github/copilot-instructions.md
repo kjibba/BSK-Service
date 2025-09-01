@@ -2,6 +2,9 @@
 
 Denne repoen har React/Vite frontend og en Node.js/Express/TypeORM backend (folder `backend-nodejs`). Flask-backenden er avviklet og fjernet fra aktiv kodebase.
 
+- Logg endringer og oppdateringer i docs/CHANGELOG.md. Dokumenter hva som er gjort mellom git-commits. Gjerne med tilbakevirkende kraft om nødvendig. Nummerer og dater endringene.
+
+
 1) Arkitektur og nøkkelfiler
 - Backend (Node): `backend-nodejs/src/app.ts` (Express-setup), `src/data-source.ts` (AppDataSource/DB), `src/entities/*.ts` (TypeORM-modeller med toDict()), `src/routes/*.ts` (API-endepunkter).
 - Frontend (Vite): `frontend/src/components/MapView.jsx`, `CustomerDetail.jsx`, `src/api.js`, `vite.config.js` (proxy /api → :8000).

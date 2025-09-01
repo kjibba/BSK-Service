@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { EquipmentAPI, EquipmentTypesAPI, VisitsAPI } from '../api'
 import Card from './ui/Card'
 import Button from './ui/Button'
 import { useToast } from './ui/Toast.jsx'
 import { RequireAuth } from './auth'
+import PageHeader from './ui/PageHeader'
+import { IconBack, IconRefresh } from './ui/icons'
 
 export default function EquipmentService({ visitId, equipmentId }){
   return (
@@ -22,7 +24,7 @@ function Inner({ visitId, equipmentId }){
   const [hours, setHours] = useState('')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { (async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const item = await EquipmentAPI.list({ id: equipmentId }).then(list => {
@@ -41,7 +43,9 @@ function Inner({ visitId, equipmentId }){
       setEq(null)
       setTypeDef(null)
     } finally { setLoading(false) }
-  })() }, [equipmentId])
+  }, [equipmentId])
+
+  useEffect(() => { load() }, [load])
 
   const fields = useMemo(() => Array.isArray(typeDef?.fields) ? typeDef.fields : [], [typeDef])
 
@@ -75,16 +79,18 @@ function Inner({ visitId, equipmentId }){
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <Card title="Utfør service">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8 }}>
-          <div>
-            <div style={{ fontWeight: 600 }}>{eq.name}</div>
-            <div style={{ fontSize: 13, color: '#475569' }}>{eq.type || 'Utstyr'}</div>
-          </div>
-          <div>
-            <Button onClick={() => window.location.hash = `visit:${visitId}`}>Tilbake</Button>
-          </div>
-        </div>
+      <PageHeader
+        title="Utfør service"
+        actions={(
+          <>
+            <Button className="btn-icon" onClick={() => load()}><IconRefresh /> Oppdater</Button>
+            <Button className="btn-icon" onClick={() => window.location.hash = `visit:${visitId}`}><IconBack /> Tilbake</Button>
+          </>
+        )}
+      />
+      <Card>
+        <div style={{ fontWeight: 600 }}>{eq.name}</div>
+        <div style={{ fontSize: 13, color: '#475569' }}>{eq.type || 'Utstyr'}</div>
       </Card>
 
       {fields.length > 0 && (

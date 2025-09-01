@@ -5,12 +5,16 @@ import { ToastProvider, useToast } from './components/ui/Toast.jsx'
 import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
 import ErrorBoundary from './components/Boundary.jsx'
 import FeedbackButton from './components/FeedbackButton.jsx'
+import Fab from './components/ui/Fab.jsx'
+import BottomSheet from './components/ui/BottomSheet.jsx'
+import { VisitsAPI, RouteChoicesAPI } from './api'
 
 // Lazy-load pages/components that are relatively heavy
 const CustomerList = lazy(() => import('./components/CustomerList.jsx'))
 const MapView = lazy(() => import('./components/MapView.jsx'))
 const MyMissions = lazy(() => import('./components/MyMissions.jsx'))
  const MyRoute = lazy(() => import('./components/MyRoute.jsx'))
+const Home = lazy(() => import('./components/Home.jsx'))
 const VisitDetail = lazy(() => import('./components/VisitDetail.jsx'))
 const EquipmentService = lazy(() => import('./components/EquipmentService.jsx'))
 const Employees = lazy(() => import('./components/Employees.jsx'))
@@ -23,11 +27,11 @@ const Login = lazy(() => import('./components/Login.jsx'))
 
 function App() {
   const [route, setRoute] = useState(() => {
-    if (typeof window === 'undefined') return 'map';
+    if (typeof window === 'undefined') return 'home';
     const h = window.location.hash.slice(1);
     if (h) return h;
     try {
-      return window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 'map' : 'customers';
+      return window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 'home' : 'customers';
     } catch {
       return 'customers';
     }
@@ -49,6 +53,7 @@ function App() {
     }
   }, [route])
   const isMap = route === 'map';
+  const isHome = route === 'home' || route === '' || route === undefined;
   const isMissions = route === 'missions';
   const isRoute = route === 'route';
   const isVisit = route.startsWith('visit:');
@@ -69,6 +74,70 @@ function App() {
   const isCustomer = route.startsWith('customer:');
   const customerId = isCustomer ? Number(route.split(':')[1]) : null;
   const isLogin = route === 'login';
+  const enableNewUi = (import.meta && import.meta.env && import.meta.env.VITE_ENABLE_NEW_UI) === 'true'
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetMode, setSheetMode] = useState('quickStart') // 'quickStart' | 'customer'
+  const [sheetData, setSheetData] = useState(null)
+  const [sheetLoading, setSheetLoading] = useState(false)
+  const [sheetError, setSheetError] = useState('')
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    try { return window.matchMedia && window.matchMedia('(max-width: 900px)').matches } catch { return false }
+  })
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 900px)')
+      const onChange = () => setIsMobile(mq.matches)
+      mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange)
+      return () => { mq.removeEventListener ? mq.removeEventListener('change', onChange) : mq.removeListener(onChange) }
+    } catch {}
+  }, [])
+  // Listen for global requests to open bottom sheet (e.g., from MapView)
+  useEffect(() => {
+    const onOpen = (e) => {
+      try {
+        const detail = e.detail || {}
+        if (detail.type === 'customer') {
+          setSheetMode('customer')
+          setSheetData(detail.customer || detail)
+          setSheetError('')
+          setSheetOpen(true)
+        }
+      } catch (_) { /* no-op */ }
+    }
+    window.addEventListener('app:openSheet', onOpen)
+    return () => window.removeEventListener('app:openSheet', onOpen)
+  }, [])
+
+  // Helper to find next planned visit for quick start
+  const loadNextVisit = async () => {
+    setSheetLoading(true); setSheetError(''); setSheetData(null)
+    try {
+      const items = await VisitsAPI.myMissions()
+      const arr = Array.isArray(items) ? items : []
+      const now = Date.now()
+      const planned = arr.filter(v => (v.status === 'Planlagt' || !v.status))
+      if (!planned.length) { setSheetData({ none: true }); return }
+      const sorted = planned.slice().sort((a,b) => new Date(a.visit_date) - new Date(b.visit_date))
+      const upcoming = sorted.find(v => new Date(v.visit_date).getTime() >= now)
+      const next = upcoming || sorted[0]
+      setSheetData({ nextVisit: next })
+    } catch (e) {
+      setSheetError(e?.message || 'Kunne ikke hente oppdrag')
+    } finally {
+      setSheetLoading(false)
+    }
+  }
+
+  const startVisitAndGo = async (id) => {
+    try {
+      await VisitsAPI.start(id)
+      setSheetOpen(false)
+      window.location.hash = `visit:${id}`
+    } catch (e) {
+      setSheetError(e?.response?.data?.error || e?.message || 'Kunne ikke starte besøk')
+    }
+  }
   return (
   <AuthProvider>
   <ToastProvider>
@@ -77,7 +146,7 @@ function App() {
   <a href="#main" className="sr-only sr-only-focusable">Hopp til innhold</a>
   <SiteHeader route={route} />
   <Hero />
-      <main id="main" ref={mainRef} tabIndex={-1} className="container" style={{padding:'2rem 1rem'}}>
+  <main id="main" ref={mainRef} tabIndex={-1} className="container" style={{padding:'2rem 1rem'}}>
         <ErrorBoundary>
         <Suspense fallback={<p>Laster…</p>}>
           {isService ? (
@@ -104,6 +173,8 @@ function App() {
             <ReportsAdmin />
           ) : isLogin ? (
             <Login />
+          ) : isHome ? (
+            <Home />
           ) : isMap ? (
             <MapView />
           ) : (
@@ -112,14 +183,89 @@ function App() {
         </Suspense>
         </ErrorBoundary>
       </main>
-  {/* Global feedback button */}
-  <FeedbackButton context={{ page: route }} />
+  {enableNewUi && isHome && (
+        <>
+          <Fab
+            label="Start neste besøk"
+            icon="▶"
+            ariaLabel="Start neste besøk"
+            onClick={() => { setSheetMode('quickStart'); setSheetOpen(true); loadNextVisit() }}
+          />
+          <BottomSheet open={sheetOpen} title={sheetMode === 'customer' ? 'Kunde' : 'Rask start'} onClose={()=> setSheetOpen(false)}>
+            {sheetMode === 'customer' ? (
+              (() => {
+                const c = sheetData || {}
+                return (
+                  <div className="stack" style={{ gap: 8 }}>
+                    <div style={{ fontWeight: 700 }}>{c.name || `Kunde #${c.id}`}</div>
+                    <div style={{ color: '#475569' }}>{[c.address, [c.postal_code, c.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || ''}</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      {c.id ? <a className="btn btn-primary" href={`#customer:${c.id}`}>Åpne kundekort</a> : null}
+                      {c.id ? (
+                        <button
+                          className="btn"
+                          onClick={async () => {
+                            try { await RouteChoicesAPI.add(c.id); alert('Lagt til i dagsruten') } catch { alert('Kunne ikke legge til i dagsruten') }
+                          }}
+                        >+ Legg til i Dagsrute</button>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="stack" style={{ gap: 8 }}>
+                {sheetLoading ? <p>Laster neste besøk…</p> : sheetError ? (
+                  <div className="card" style={{ padding: 8, color: '#b91c1c' }}>{sheetError}</div>
+                ) : sheetData?.none ? (
+                  <div>
+                    <p>Ingen planlagte besøk funnet.</p>
+                    <a href="#missions" className="btn btn-primary">Gå til Mine oppdrag</a>
+                  </div>
+                ) : sheetData?.nextVisit ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Neste besøk #{sheetData.nextVisit.id}</div>
+                      <div>{new Date(sheetData.nextVisit.visit_date).toLocaleString()}</div>
+                      {sheetData.nextVisit.customer_id && (
+                        <div>
+                          Kunde #{sheetData.nextVisit.customer_id}
+                          {sheetData.nextVisit.customer_name ? <> — <a href={`#customer:${sheetData.nextVisit.customer_id}`}>{sheetData.nextVisit.customer_name}</a></> : null}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <a className="btn" href={`#visit:${sheetData.nextVisit.id}`}>Åpne</a>
+                      <button className="btn btn-primary" onClick={() => startVisitAndGo(sheetData.nextVisit.id)}>Start</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p>Fant ikke neste besøk.</p>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <a href="#missions" className="btn">Mine oppdrag</a>
+                  <button className="btn" onClick={() => setSheetOpen(false)}>Lukk</button>
+                </div>
+              </div>
+            )}
+          </BottomSheet>
+        </>
+      )}
+  {/* Global feedback (controlled). Hide floating trigger; expose via bottom nav icon */}
+  <FeedbackButton context={{ page: route }} open={feedbackOpen} onOpenChange={setFeedbackOpen} hideTrigger={isMobile} />
       {/* Mobile bottom tab bar */}
-      <div className="bottom-tabbar">
+    <div className="bottom-tabbar">
         <div className="container inner">
-          <a className={`tab-btn ${(!isMap && !isMissions && !isVisit) ? 'active' : ''}`} href="#customers">Kunder</a>
+          <a className={`tab-btn ${isHome ? 'active' : ''}`} href="#home">Hjem</a>
+          <a className={`tab-btn ${(!isMap && !isMissions && !isVisit && !isHome) ? 'active' : ''}`} href="#customers">Kunder</a>
           <a className={`tab-btn ${isMap ? 'active' : ''}`} href="#map">Kart</a>
           <a className={`tab-btn ${isMissions ? 'active' : ''}`} href="#missions">Mine oppdrag</a>
+          <button className="tab-btn" type="button" aria-label="Send tilbakemelding" onClick={()=> setFeedbackOpen(v => !v)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+              <path d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="m3 8 8.485 6.364a1 1 0 0 0 1.03 0L21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
       </div>
       <SiteFooter />

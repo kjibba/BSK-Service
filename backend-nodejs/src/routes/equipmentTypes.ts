@@ -1,11 +1,12 @@
 import express from "express";
 import { AppDataSource } from "../data-source";
 import { EquipmentType } from "../entities/EquipmentType";
+import { requireAuthenticated, requireAdmin, requireJwt } from "./auth";
 
 const router = express.Router();
 
-// GET /api/equipment-types
-router.get("/", async (req, res) => {
+// GET /api/equipment-types (authenticated)
+router.get("/", requireAuthenticated, async (req, res) => {
   try {
     const equipmentTypeRepository = AppDataSource.getRepository(EquipmentType);
     const equipmentTypes = await equipmentTypeRepository.find({
@@ -19,8 +20,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/equipment-types
-router.post("/", async (req, res) => {
+// POST /api/equipment-types (admin/manager)
+router.post("/", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const equipmentTypeRepository = AppDataSource.getRepository(EquipmentType);
     const { name, fields } = req.body;
@@ -42,8 +43,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// PUT /api/equipment-types/:id
-router.put("/:id", async (req, res) => {
+// PUT /api/equipment-types/:id (admin/manager)
+router.put("/:id", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const equipmentTypeRepository = AppDataSource.getRepository(EquipmentType);
     const id = parseInt(req.params.id, 10);
@@ -71,8 +72,8 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/equipment-types/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /api/equipment-types/:id (admin/manager)
+router.delete("/:id", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const equipmentTypeRepository = AppDataSource.getRepository(EquipmentType);
     const id = parseInt(req.params.id, 10);

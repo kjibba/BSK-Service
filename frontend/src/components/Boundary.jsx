@@ -11,6 +11,21 @@ export class ErrorBoundary extends Component {
   componentDidCatch(error, info){
     // eslint-disable-next-line no-console
     console.error('UI error boundary caught:', error, info)
+    try {
+      const payload = {
+        level: 'error',
+        message: String(error?.message || error),
+        stack: String(error?.stack || ''),
+        url: window?.location?.href,
+        route: window?.location?.hash?.slice(1) || '',
+        meta: { componentStack: info?.componentStack }
+      }
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/meta/client-log', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+      } else {
+        fetch('/api/meta/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true })
+      }
+    } catch (_) { /* no-op */ }
   }
   render(){
     if (this.state.hasError){

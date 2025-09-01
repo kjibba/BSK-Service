@@ -1,14 +1,19 @@
 services:
   backend:
+    extends:
+      file: ./docker-compose.yml
+      service: backend
     environment:
-      # Peker backend til ekstern utviklingsdatabase
-      - NODE_ENV=development
-      - PORT=8000
-      - DB_HOST=${DB_HOST:-host.docker.internal}
-      - DB_PORT=${DB_PORT:-3306}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_SYNC=${DB_SYNC:-false}
+      # Peker backend til ekstern utviklingsdatabase (overstyring av base)
+      NODE_ENV: development
+      PORT: 8000
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_SYNC: ${DB_SYNC:-false}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     depends_on: []
-  db: null
+  db:
+    profiles: ["never"]

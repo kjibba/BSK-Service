@@ -5,6 +5,9 @@ services:
       dockerfile: ./nginx/Dockerfile.local
     ports:
       - "5175:80" # serve SPA locally on 5175 to match Vite proxy expectations
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_PASS: ${BASIC_AUTH_PASS:-}
     volumes:
       - backend_static:/app/static:ro
     depends_on:
@@ -13,17 +16,21 @@ services:
       - bsk_net
 
   backend:
+    extends:
+      file: ./docker-compose.yml
+      service: backend
     # Standard: koble mot lokal db-tjeneste (under). Sett PROFIL=extdb for å bruke ekstern DB.
     environment:
-      - NODE_ENV=development
-      - PORT=8000
+      NODE_ENV: development
+      PORT: 8000
       # Default internt: 'db'. For ekstern DB, sett DB_HOST=host.docker.internal eller IP i .env.local
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-3306}
-      - DB_USERNAME=${DB_USERNAME:-${MYSQL_USER}}
-      - DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD}}
-      - DB_DATABASE=${DB_DATABASE:-${MYSQL_DATABASE}}
-      - DB_SYNC=true
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USERNAME: ${DB_USERNAME:-${MYSQL_USER}}
+      DB_PASSWORD: ${DB_PASSWORD:-${MYSQL_PASSWORD}}
+      DB_DATABASE: ${DB_DATABASE:-${MYSQL_DATABASE}}
+      DB_SYNC: true
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     ports:
       - "8000:8000"
     volumes:
@@ -35,7 +42,9 @@ services:
       - bsk_net
 
   db:
-  # Lokal MariaDB for utvikling. Hopp over denne tjenesten hvis du peker backend mot ekstern DB.
+    image: mariadb:10.11
+    restart: unless-stopped
+    # Lokal MariaDB for utvikling. Hopp over denne tjenesten hvis du peker backend mot ekstern DB.
     ports:
       - "3307:3306" # expose for local tools like HeidiSQL
     environment:
@@ -43,11 +52,14 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
     networks:
       - bsk_net
 
 volumes:
   backend_static:
+  db_data:
 
 networks:
   bsk_net:

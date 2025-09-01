@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { EmployeesAPI } from '../api'
 import Button from './ui/Button'
+import { IconRefresh } from './ui/icons'
+import PageHeader from './ui/PageHeader'
 import Card from './ui/Card'
 import { Loading, ErrorState } from './ui/States'
 import { useToast } from './ui/Toast.jsx'
@@ -54,7 +56,8 @@ function Inner(){
 
   return (
     <Card title="Ansatte">
-      <p style={{marginTop:0, color:'#64748b'}}>Fant {items.length} ansatte.</p>
+  <PageHeader title={<h2 style={{margin:0}}>Ansatte</h2>} actions={<Button className="btn-icon" onClick={load}><IconRefresh /> Oppdater</Button>} />
+      <p style={{margin:'4px 0 8px', color:'#64748b'}}>Fant {items.length} ansatte.</p>
       <ul className="list">
         {items.map(it => (
           <li key={it.id} style={{display:'flex', alignItems:'center', gap:12}}>

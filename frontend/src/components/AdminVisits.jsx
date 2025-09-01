@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { VisitsAPI, EmployeesAPI } from '../api'
 import Button from './ui/Button'
+import { IconRefresh } from './ui/icons'
+import PageHeader from './ui/PageHeader'
+import Card from './ui/Card'
 import { Loading, Empty, ErrorState } from './ui/States'
 import { RequireAuth } from './auth'
 import { useAuth } from './hooks/useAuth'
@@ -69,64 +72,69 @@ function Inner(){
   }
 
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'8px 0 12px',gap:12}}>
-        <h1 style={{margin:0}}>Oppdrag (admin)</h1>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <label style={{fontSize:12,color:'#475569'}}>Status:</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Alle</option>
-            <option value="Planlagt">Planlagt</option>
-            <option value="Pågående">Pågående</option>
-            <option value="Fullført">Fullført</option>
-          </select>
-          <label style={{display:'flex',alignItems:'center',gap:6, marginLeft:12, fontSize:13}}>
-            <input type="checkbox" checked={allChecked} onChange={(e) => setSelected(e.target.checked ? allPlannedIds : [])} />
-            <span>Velg alle planlagte</span>
-          </label>
-          <Button size="sm" variant="danger" disabled={!selected.length} onClick={batchDelete}>Slett valgte</Button>
-        </div>
-      </div>
+    <div className="stack" style={{ gap: 16 }}>
+      <PageHeader
+        title="Oppdrag (admin)"
+        actions={(
+          <>
+            <label style={{fontSize:12,color:'#475569'}}>Status:</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">Alle</option>
+              <option value="Planlagt">Planlagt</option>
+              <option value="Pågående">Pågående</option>
+              <option value="Fullført">Fullført</option>
+            </select>
+            <label style={{display:'flex',alignItems:'center',gap:6, marginLeft:12, fontSize:13}}>
+              <input type="checkbox" checked={allChecked} onChange={(e) => setSelected(e.target.checked ? allPlannedIds : [])} />
+              <span>Velg alle planlagte</span>
+            </label>
+            <Button size="sm" variant="danger" disabled={!selected.length} onClick={batchDelete}>Slett valgte</Button>
+            <Button size="sm" className="btn-icon" onClick={() => load()}><IconRefresh /> Oppdater</Button>
+          </>
+        )}
+      />
       {!filtered.length ? (
         <Empty>Ingen oppdrag.</Empty>
       ) : (
-        <div className="list">
-          {filtered.map(v => (
-            <div key={v.id} className="list-item" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                {(v.status||'') === 'Planlagt' ? (
-                  <input type="checkbox" checked={selected.includes(v.id)} onChange={(e)=> setSelected(prev => e.target.checked ? Array.from(new Set([...prev, v.id])) : prev.filter(x => x !== v.id))} />
-                ) : <div style={{width:16}} />}
-                <div>
-                  <div style={{fontWeight:600}}>{v.customer?.name || 'Kunde'} — {v.technician || v.assigned_technician_id ? `(${v.technician || ('Tekniker #' + v.assigned_technician_id)})` : ''}</div>
-                  <div style={{fontSize:12, color:'#475569'}}>{v.visit_date ? new Date(v.visit_date).toLocaleString() : '-'} — {v.status || 'Planlagt'}</div>
-                  {isAdmin && (
-                    <div style={{marginTop:6}}>
-                      <label style={{fontSize:12, color:'#475569', marginRight:6}}>Tildel:</label>
-                      <select
-                        className="input"
-                        value={v.assigned_technician_id || ''}
-                        onChange={async (e)=> { const tid = e.target.value; if (!tid) return; await VisitsAPI.assign(v.id, Number(tid)); await load() }}
-                        style={{maxWidth:260}}
-                      >
-                        <option value="">Velg tekniker…</option>
-                        {emps.map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.name || emp.email}</option>
-                        ))}
-                      </select>
-                    </div>
+        <Card>
+          <div className="list">
+            {filtered.map(v => (
+              <div key={v.id} className="list-item" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  {(v.status||'') === 'Planlagt' ? (
+                    <input type="checkbox" checked={selected.includes(v.id)} onChange={(e)=> setSelected(prev => e.target.checked ? Array.from(new Set([...prev, v.id])) : prev.filter(x => x !== v.id))} />
+                  ) : <div style={{width:16}} />}
+                  <div>
+                    <div style={{fontWeight:600}}>{v.customer?.name || 'Kunde'} — {v.technician || v.assigned_technician_id ? `(${v.technician || ('Tekniker #' + v.assigned_technician_id)})` : ''}</div>
+                    <div style={{fontSize:12, color:'#475569'}}>{v.visit_date ? new Date(v.visit_date).toLocaleString() : '-'} — {v.status || 'Planlagt'}</div>
+                    {isAdmin && (
+                      <div style={{marginTop:6}}>
+                        <label style={{fontSize:12, color:'#475569', marginRight:6}}>Tildel:</label>
+                        <select
+                          className="input"
+                          value={v.assigned_technician_id || ''}
+                          onChange={async (e)=> { const tid = e.target.value; if (!tid) return; await VisitsAPI.assign(v.id, Number(tid)); await load() }}
+                          style={{maxWidth:260}}
+                        >
+                          <option value="">Velg tekniker…</option>
+                          {emps.map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name || emp.email}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{whiteSpace:'nowrap',display:'flex',gap:8}}>
+                  <Button size="sm" onClick={() => window.location.hash = `visit:${v.id}`}>Åpne</Button>
+                  {(v.status||'') === 'Planlagt' && (
+                    <Button size="sm" variant="danger" onClick={async ()=>{ if (!window.confirm('Slette oppdrag?')) return; try{ await VisitsAPI.delete(v.id); await load() } catch { alert('Sletting feilet') }}}>Slett</Button>
                   )}
                 </div>
               </div>
-              <div style={{whiteSpace:'nowrap',display:'flex',gap:8}}>
-                <Button size="sm" onClick={() => window.location.hash = `visit:${v.id}`}>Åpne</Button>
-                {(v.status||'') === 'Planlagt' && (
-                  <Button size="sm" variant="danger" onClick={async ()=>{ if (!window.confirm('Slette oppdrag?')) return; try{ await VisitsAPI.delete(v.id); await load() } catch { alert('Sletting feilet') }}}>Slett</Button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Card>
       )}
     </div>
   )

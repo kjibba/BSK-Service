@@ -6,12 +6,13 @@ import { Visit } from "../entities/Visit";
 import { ServiceLog } from "../entities/ServiceLog";
 import { In } from "typeorm";
 import { ServiceReport } from "../entities/ServiceReport";
-import { requireJwt, requireAdmin } from "./auth";
+import { requireJwt, requireAdmin, requireAuthenticated } from "./auth";
+import { CustomerCreateSchema, CustomerUpdateSchema } from "../utils/validation";
 
 const router = express.Router();
 
 // GET /api/customers
-router.get("/", async (req, res) => {
+router.get("/", requireAuthenticated, async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
     const { sort, include, has_coords, q, city, bydel } = req.query as any;
@@ -78,11 +79,11 @@ router.get("/", async (req, res) => {
       const result = customers.map(customer => {
         const obj: any = customer.toDict();
         // Compute expected date from last visit + visitsPerYear
-  const last = lastByCustomer.get(customer.id) || null;
-  const vpyRaw = Number(customer.visitsPerYear || 0);
-  const vpy = vpyRaw > 0 ? vpyRaw : 4; // fallback standard: 4 besøk per år
+        const last = lastByCustomer.get(customer.id) || null;
+        const vpyRaw = Number(customer.visitsPerYear || 0);
+        const vpy = vpyRaw > 0 ? vpyRaw : 4; // fallback standard: 4 besøk per år
         let expected: Date | null = null;
-  if (last && vpy > 0) {
+        if (last && vpy > 0) {
           const days = Math.max(1, Math.round(365 / vpy));
           expected = new Date(last.getTime() + days * 24 * 60 * 60 * 1000);
         }
@@ -96,7 +97,7 @@ router.get("/", async (req, res) => {
         obj.next_visit_date = planned ? planned.toISOString() : (expected ? expected.toISOString() : null);
 
         // Status based on expected date (same as map)
-  let status: "green" | "yellow" | "red" = "red";
+        let status: "green" | "yellow" | "red" = "red";
         if (expected) {
           const now = new Date();
           const diffDays = Math.ceil((expected.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -138,13 +139,25 @@ router.get("/inactive", requireJwt, requireAdmin(), async (_req, res) => {
 });
 
 // GET /api/map/customers
-router.get("/customers", async (req, res) => {
+router.get("/customers", requireAuthenticated, async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
     const equipmentRepository = AppDataSource.getRepository(Equipment);
     const visitRepository = AppDataSource.getRepository(Visit);
     
-    const customers = await customerRepository.find();
+    // Prefer active customers; fallback to all if the `active` column is missing on restored DBs
+    let customers: Customer[] = [] as any;
+    try {
+      customers = await customerRepository.find({ where: { active: true } as any });
+    } catch (err: any) {
+      console.error('Error filtering active customers, falling back to all customers:', err?.message || err);
+      // If the error is because the column doesn't exist, return all customers to avoid total failure
+      if (err && err.code === 'ER_BAD_FIELD_ERROR') {
+        customers = await customerRepository.find();
+      } else {
+        throw err;
+      }
+    }
     const result = [];
 
     // Precompute next upcoming visits for all customers to avoid N+1
@@ -244,14 +257,17 @@ router.get("/customers", async (req, res) => {
 });
 
 // POST /api/customers
-router.post("/", async (req, res) => {
+router.post("/", requireAuthenticated, async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
-    const { name, address, postal_code, city, contact_person, email, phone } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: "Missing data" });
+    const parsed = CustomerCreateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Ugyldig input",
+        errors: parsed.error.issues?.map(i => ({ path: i.path?.join('.') || '', message: i.message })) || [],
+      });
     }
+    const { name, address, postal_code, city, contact_person, email, phone, org_number } = parsed.data;
 
     const customer = new Customer();
     customer.name = name;
@@ -261,7 +277,8 @@ router.post("/", async (req, res) => {
     customer.contactPerson = contact_person;
     customer.email = email;
     customer.phone = phone;
-  customer.active = true;
+    customer.orgNumber = org_number;
+    customer.active = true;
 
     await customerRepository.save(customer);
     res.status(201).json(customer.toDict());
@@ -272,7 +289,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/customers/:id
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) {
@@ -296,7 +313,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PUT /api/customers/:id
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) {
@@ -312,7 +329,14 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-  const { name, address, postal_code, city, contact_person, email, phone, latitude, longitude, active } = req.body;
+    const parsed = CustomerUpdateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Ugyldig input",
+        errors: parsed.error.issues?.map(i => ({ path: i.path?.join('.') || '', message: i.message })) || [],
+      });
+    }
+    const { name, address, postal_code, city, contact_person, email, phone, org_number, visits_per_year, start_date, latitude, longitude, active } = parsed.data;
 
     if (name !== undefined) customer.name = name;
     if (address !== undefined) customer.address = address;
@@ -321,9 +345,12 @@ router.put("/:id", async (req, res) => {
     if (contact_person !== undefined) customer.contactPerson = contact_person;
     if (email !== undefined) customer.email = email;
     if (phone !== undefined) customer.phone = phone;
-    if (latitude !== undefined) customer.latitude = latitude;
-    if (longitude !== undefined) customer.longitude = longitude;
-  if (active !== undefined) customer.active = !!active;
+    if (org_number !== undefined) customer.orgNumber = org_number;
+    if (visits_per_year !== undefined) customer.visitsPerYear = visits_per_year as unknown as number;
+    if (start_date !== undefined) customer.startDate = start_date ? new Date(start_date as string) : undefined;
+    if (latitude !== undefined) customer.latitude = latitude as unknown as number;
+    if (longitude !== undefined) customer.longitude = longitude as unknown as number;
+    if (active !== undefined) customer.active = !!active;
 
     await customerRepository.save(customer);
     res.json(customer.toDict());
@@ -333,8 +360,8 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/customers/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /api/customers/:id -> soft delete (set active = false). Falls back to hard delete if DB lacks the column.
+router.delete("/:id", requireAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) {
@@ -342,21 +369,37 @@ router.delete("/:id", async (req, res) => {
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
-    const result = await customerRepository.delete(id);
+    const customer = await customerRepository.findOne({ where: { id } });
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
 
-    if (result.affected === 0) {
-      return res.status(404).json({ error: "Customer not found" });
+    // Try soft-delete by flipping active -> false
+    try {
+      // Some restored DBs may be missing the `active` column; this will throw in that case
+      // Keep the change in DB and return the updated object
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      customer.active = false;
+      await customerRepository.save(customer);
+      return res.json({ message: "Customer deactivated", customer: customer.toDict() });
+    } catch (innerErr: any) {
+      console.error("Soft-delete failed, attempting fallback hard delete:", innerErr);
+      // If the error is due to missing column (e.g. ER_BAD_FIELD_ERROR), fallback to hard delete
+      if (innerErr && (innerErr.code === 'ER_BAD_FIELD_ERROR' || innerErr.code === 'ER_TRUNCATED_WRONG_VALUE')) {
+        const result = await customerRepository.delete(id);
+        if (result.affected === 0) return res.status(404).json({ error: "Customer not found" });
+        return res.json({ message: "Customer deleted (fallback)" });
+      }
+      // Otherwise rethrow to be handled by outer catch
+      throw innerErr;
     }
-
-    res.json({ message: "Customer deleted successfully" });
   } catch (error) {
-    console.error("Error deleting customer:", error);
-    res.status(500).json({ error: "Failed to delete customer" });
+    console.error("Error deleting/deactivating customer:", error);
+    res.status(500).json({ error: "Failed to delete/deactivate customer" });
   }
 });
 
 // GET /api/customers/:id/detail
-router.get("/:id/detail", async (req, res) => {
+router.get("/:id/detail", requireAuthenticated, async (req, res) => {
   try {
     const customerId = parseInt(req.params.id, 10);
     if (!Number.isInteger(customerId)) {
@@ -485,7 +528,7 @@ router.put("/:id/reactivate", requireJwt, requireAdmin(), async (req, res) => {
 });
 
 // POST /api/customers/:id/fix-geo
-router.post("/:id/fix-geo", async (req, res) => {
+router.post("/:id/fix-geo", requireAuthenticated, async (req, res) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
     const id = parseInt(req.params.id, 10);

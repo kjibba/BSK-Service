@@ -1,5 +1,0 @@
-services:
-  backend:
-    environment:
-      - NODE_ENV=development
-      - DB_SYNC=true

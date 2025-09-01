@@ -5,6 +5,10 @@ Internverktøy for Bergen Skadedyrkontroll: kunder, utstyr, besøk og servicelog
 Aktiv backend er Node.js/Express/TypeORM i `backend-nodejs/`. Frontend er React/Vite i `frontend/`.
 Den gamle Flask-backenden i `backend/` er arkivert for referanse og brukes ikke i drift.
 
+## Arbeidsdokument (UX/UI og deploy)
+
+Se «levende» plan, status og sjekklister i docs/ARBEIDSDOKUMENT.md.
+
 ## Hurtigstart (utvikling)
 
 Forutsetninger
@@ -34,7 +38,7 @@ npm run dev
 
 ## Docker Compose (NAS/produksjon)
 
-Bruk `docker-compose.yml` for Nginx (SPA + reverse proxy), Node-backend og MariaDB.
+Bruk `docker-compose.yml` for Nginx (SPA + reverse proxy) og Node-backend mot ekstern DB.
 
 ```powershell
 cd F:\dev\BSK_Service_App
@@ -66,8 +70,8 @@ Steps on server:
 	docker compose run --rm backend node dist/run-migrations.js
 
 Services:
-- Nginx: :80 (and 443 if configured)
-- Backend: internal :8000 (proxied by Nginx)
+- Nginx: :80 (og 443 hvis konfigurert)
+- Backend: intern :8000 (proxes av Nginx)
 - DB: internal MariaDB (volume `db_data`)
 
 ## Lokal Docker (speil av prod)
@@ -91,7 +95,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env
 Dette gir:
 - DB: MariaDB på localhost:3307 (for HeidiSQL)
 - Backend: http://localhost:8000
-- Frontend (via Nginx): http://localhost:5175
+- Frontend (via Nginx): http://localhost
 
 Helse:
 - http://localhost:8000/health
@@ -101,6 +105,61 @@ Stopp og rydd (inkl. volumer):
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local down -v
 ```
+
+### Se på mobil i dev (Docker)
+
+Når du kjører lokalt via Docker/Nginx (ikke Vite), er frontenden tilgjengelig på PC‑ens LAN‑IP:
+
+- Sett DB-tilkobling i `.env.extdb` (se `.env.extdb.example`).
+- Finn PC‑ens IP (for eksempel 192.168.x.y) og åpne på mobilen: `http://192.168.x.y:5175`.
+- PC og mobil må være på samme Wi‑Fi. Eventuell VPN kan blokkere.
+- Windows-brannmur: Tillat innkommende på TCP 5175 (Privat nett). Du kan lage en regel via Windows‑GUI eller PowerShell.
+- Helse: `http://192.168.x.y:5175/health` proxes til backend og bør svare OK.
+
+Merk:
+- Frontenden bygges og servres av Nginx. Ingen Vite‑devserver.
+- Proxy: `/api` og `/static` rutes til backend på `http://backend:8000` inne i nettverket.
+
+## Alternativ: Lokal Docker med hot‑reload (Vite + tsx)
+
+Ønsker du direkte oppdatering ved filendringer uten å bygge images på nytt, bruk Vite-devserver og tsx i containere.
+
+Start:
+
+```powershell
+cd F:\dev\BSK_Service_App
+docker compose -f docker-compose.yml -f docker-compose.local.vite.yml --env-file .env.local up
+```
+
+Eller bruk hjelpeskript (Windows PowerShell):
+
+```powershell
+cd F:\dev\BSK_Service_App
+# Start i bakgrunnen
+.\scripts\dev_hotreload.ps1 up -Detached
+# Se logger: .\scripts\dev_hotreload.ps1 logs
+# Stopp:     .\scripts\dev_hotreload.ps1 down
+```
+
+Hvis du IKKE bruker hot‑reload og kjører Nginx‑dev (bygget SPA), rebuild slik:
+
+```powershell
+cd F:\dev\BSK_Service_App
+docker compose --env-file .env.extdb up -d --build
+# eller bruk skript: .\scripts\dev_rebuild_spa.ps1
+```
+
+Dette gir:
+- Frontend (Vite) på http://localhost:5175 (eksponert til LAN)
+- Backend (tsx watch) på http://localhost:8000
+- DB: MariaDB på localhost:3307 (om `db` er aktiv i base compose)
+
+Mobiltilgang: bruk http://<PC-IP>:5175
+
+Merk:
+- Denne modusen hopper over Nginx (med mindre du eksplisitt aktiverer profilen `spa`).
+- Frontend-proxy til backend styres av `vite.config.js` (proxy til :8000).
+- Beste valg for daglig utvikling; endringer blir synlige uten rebuild.
 
 ### Bruke ekstern utviklingsdatabase lokalt (valgfritt)
 
@@ -136,3 +195,24 @@ Mappen `backend/` inneholder en eldre Flask-implementasjon. Den er bevart kun so
 ## Copilot-instruksjoner
 
 Se `.github/copilot-instructions.md` for prosjektspesifikke retningslinjer (mappestruktur, API-konvensjoner, datoformat, PowerShell-eksempler, m.m.).
+
+## Database: backup og restore (Docker/MariaDB)
+
+- Backup (Linux/macOS bash): `./scripts/db_backup.sh` (skriver til `./db_backups/backup_*.sql.gz`)
+- Restore (Linux/macOS bash): `./scripts/db_restore.sh <dump.sql|dump.sql.gz>`
+- Restore (Windows PowerShell):
+
+```powershell
+cd F:\dev\BSK_Service_App
+# Start stack (db må kjøre)
+docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file .env.local up -d db
+# Importer dump
+./scripts/db_restore.ps1 -Path .\db_backups\backup_20250823T182718Z.sql.gz  # eksempel
+# Kjør migrasjoner (Node backend) etter restore
+docker compose run --rm backend node dist/run-migrations.js
+```
+
+Tips:
+- Ta backup før du restore: behold en kopi.
+- For ekstern dev‑DB, bruk `DB_HOST=host.docker.internal` i `.env.local` og importer via klient (HeidiSQL) hvis ønskelig.
+ - Se også docs/DB_RESTORE_TIPS.md for rettigheter og manuell kolonne‑fix etter restore.

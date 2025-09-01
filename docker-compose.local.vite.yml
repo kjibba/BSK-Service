@@ -1,0 +1,69 @@
+services:
+  # Disable nginx in hot-reload mode unless profile 'spa' is explicitly enabled
+  nginx:
+    profiles: ["spa"]
+
+  # Backend in watch mode (tsx)
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-3306}
+      # Bruk MYSQL_* fra .env.local for å holde én kilde til sannhet
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_DATABASE: ${MYSQL_DATABASE}
+      DB_SYNC: true
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    volumes:
+      - ./backend-nodejs:/app
+      - /app/node_modules
+      - backend_static:/app/static
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - bsk_net
+
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data_vite:/var/lib/mysql
+    networks:
+      - bsk_net
+
+  # Frontend Vite dev server exposed to LAN
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5175"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5175:5175"
+    depends_on:
+      - backend
+    networks:
+      - bsk_net
+
+volumes:
+  backend_static:
+  db_data_vite:
+
+networks:
+  bsk_net:
+    driver: bridge

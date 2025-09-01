@@ -8,6 +8,8 @@ import { Equipment } from "../entities/Equipment";
 import { MaterialUsage } from "../entities/MaterialUsage";
 import { In } from "typeorm";
 import { requireJwt, requireAdmin } from "./auth";
+import { VisitCreateSchema, VisitUpdateSchema } from "../utils/validation";
+import { saveDataUrlImage } from "../utils/uploads";
 import path from "path";
 import { sendMail } from "../utils/mailer";
 import { generateServiceReportPdf } from "../utils/reportPdf";
@@ -168,21 +170,33 @@ router.get("/report", requireJwt, requireAdmin(), async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const visitRepository = AppDataSource.getRepository(Visit);
-  const { customer_id, visit_date, technician, notes, status, assigned_technician_id } = req.body;
-
-    if (!customer_id || !visit_date) {
-      return res.status(400).json({ error: "Missing required fields" });
+    const parsed = VisitCreateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Ugyldig input",
+        errors: parsed.error.issues?.map(i => ({ path: i.path?.join('.') || '', message: i.message })) || [],
+      });
     }
+    const { customer_id, visit_date, technician, notes, status, assigned_technician_id, customer_signature_url, technician_signature_url } = parsed.data;
 
     const visit = new Visit();
-    visit.customerId = customer_id;
-    visit.visitDate = new Date(visit_date);
-    visit.technician = technician;
-    visit.notes = notes;
-    visit.status = status || "Planlagt";
+    visit.customerId = customer_id as unknown as number;
+    visit.visitDate = new Date(String(visit_date));
+    visit.technician = technician as any;
+    visit.notes = notes as any;
+    visit.status = (status as any) || "Planlagt";
     if (assigned_technician_id !== undefined) {
       const tid = Number(assigned_technician_id);
       if (!Number.isNaN(tid)) visit.assignedTechnicianId = tid;
+    }
+    // Support data URL uploads for signature images
+    if (customer_signature_url !== undefined) {
+      const url = (String(customer_signature_url).startsWith('data:') ? saveDataUrlImage(String(customer_signature_url)) : undefined) || (customer_signature_url as any);
+      visit.customerSignatureUrl = url as any;
+    }
+    if (technician_signature_url !== undefined) {
+      const url = (String(technician_signature_url).startsWith('data:') ? saveDataUrlImage(String(technician_signature_url)) : undefined) || (technician_signature_url as any);
+      visit.technicianSignatureUrl = url as any;
     }
 
     await visitRepository.save(visit);
@@ -485,14 +499,29 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Visit not found" });
     }
 
-    const { visit_date, technician, notes, status, started_at, completed_at } = req.body;
+    const parsed = VisitUpdateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Ugyldig input",
+        errors: parsed.error.issues?.map(i => ({ path: i.path?.join('.') || '', message: i.message })) || [],
+      });
+    }
+    const { visit_date, technician, notes, status, started_at, completed_at, customer_signature_url, technician_signature_url } = parsed.data;
 
-    if (visit_date !== undefined) visit.visitDate = new Date(visit_date);
-    if (technician !== undefined) visit.technician = technician;
-    if (notes !== undefined) visit.notes = notes;
-    if (status !== undefined) visit.status = status;
-    if (started_at !== undefined) visit.startedAt = started_at ? new Date(started_at) : undefined;
-    if (completed_at !== undefined) visit.completedAt = completed_at ? new Date(completed_at) : undefined;
+    if (visit_date !== undefined) visit.visitDate = new Date(String(visit_date));
+    if (technician !== undefined) visit.technician = technician as any;
+    if (notes !== undefined) visit.notes = notes as any;
+    if (status !== undefined) visit.status = status as any;
+    if (started_at !== undefined) visit.startedAt = started_at ? new Date(String(started_at)) : undefined;
+    if (completed_at !== undefined) visit.completedAt = completed_at ? new Date(String(completed_at)) : undefined;
+    if (customer_signature_url !== undefined) {
+      const url = (String(customer_signature_url).startsWith('data:') ? saveDataUrlImage(String(customer_signature_url)) : undefined) || (customer_signature_url as any);
+      visit.customerSignatureUrl = url as any;
+    }
+    if (technician_signature_url !== undefined) {
+      const url = (String(technician_signature_url).startsWith('data:') ? saveDataUrlImage(String(technician_signature_url)) : undefined) || (technician_signature_url as any);
+      visit.technicianSignatureUrl = url as any;
+    }
 
     await visitRepository.save(visit);
     res.json(visit.toDict());

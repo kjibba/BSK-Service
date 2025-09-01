@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Logg inn – BSK Service</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji"}
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;background:#0b1e2b}
+    .card{background:#fff;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.2);padding:24px;max-width:360px;width:92%}
+    h1{margin:0 0 6px 0;font-size:20px}
+    p{margin:0 0 16px 0;color:#444}
+    label{display:block;font-size:13px;color:#333;margin:12px 0 6px}
+    input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px}
+    button{width:100%;margin-top:16px;padding:10px 12px;font-size:15px;border:0;border-radius:8px;background:#0d6efd;color:#fff;cursor:pointer}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .err{color:#a00;margin-top:10px;min-height:1.2em}
+    .foot{font-size:12px;color:#666;margin-top:14px;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Logg inn</h1>
+      <p>Du må være innlogget for å bruke BSK Service.</p>
+      <form id="f">
+        <label for="email">E‑post</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+  <label for="password">Passord</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" />
+        <button id="btn" type="submit">Logg inn</button>
+        <div id="err" class="err"></div>
+      </form>
+      <div class="foot">© BSK</div>
+    </div>
+  </div>
+<script>
+(function(){
+  const f = document.getElementById('f');
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('err');
+  f.addEventListener('submit', async function(e){
+    e.preventDefault(); err.textContent = ''; btn.disabled = true;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+  if (res.status === 409) {
+        // Førstegangsbruker: send til set-password
+        location.replace('/set-password.html?email=' + encodeURIComponent(email));
+        return;
+      }
+      if (!res.ok) {
+        let msg = 'Innlogging feilet';
+        try { const j = await res.json(); if (j && j.error) msg = j.error; } catch {}
+        throw new Error(msg);
+      }
+      // Logged in: verifiser at sesjon er aktiv før vi går videre
+      try {
+        const chk = await fetch('/api/auth/check', { credentials: 'same-origin' });
+        if (chk.status !== 204) {
+          // No session yet – prøv en kort retry-loop i tilfelle forsinkelse i Set-Cookie
+          let ok = false;
+          for (let i=0;i<5;i++) {
+            await new Promise(r=>setTimeout(r, 150));
+            const c2 = await fetch('/api/auth/check', { credentials: 'same-origin' });
+            if (c2.status === 204) { ok = true; break; }
+          }
+          if (!ok) throw new Error('Klarte ikke å starte sesjon (cookies blokkert?)');
+        }
+      } catch (e) {
+        err.textContent = e.message || 'Innlogging feilet (cookies?)';
+        btn.disabled = false;
+        return;
+      }
+
+      // Sjekk om denne brukeren må sette et første passord
+      try {
+        const s = await fetch('/api/auth/password_status', { credentials: 'same-origin' });
+        if (s.ok) {
+          const j = await s.json();
+          if (j && j.requiresSetup) {
+            location.replace('/set-password.html');
+            return;
+          }
+        }
+      } catch {}
+      // Default: go to app root
+      location.replace('/');
+    } catch (e) {
+      err.textContent = e.message || 'Innlogging feilet';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

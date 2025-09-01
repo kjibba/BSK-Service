@@ -9,6 +9,7 @@ import { AppDataSource } from "./data-source";
 // Import routes
 // @ts-ignore: route modules may be JS-built or generated at runtime
 import authRoutes from "./routes/auth";
+import { requireAuthenticated } from "./routes/auth";
 // @ts-ignore: route modules may be JS-built or generated at runtime
 import customerRoutes from "./routes/customers";
 // @ts-ignore: route modules may be JS-built or generated at runtime
@@ -35,6 +36,12 @@ import reportsRoutes from "./routes/serviceReports";
 const app = express();
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || "development";
+const COOKIE_SECURE = String(process.env.COOKIE_SECURE ?? (NODE_ENV === "production" ? "false" : "false")).toLowerCase() === "true";
+const COOKIE_NAME = process.env.SESSION_NAME || 'connect.sid';
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
+
+// Behind nginx/proxy in docker: trust proxy so cookies and protocol are detected correctly
+app.set("trust proxy", 1);
 
 // Minimal health endpoint registered BEFORE middleware so it can't be blocked by them
 app.get("/healthz", (_req, res) => {
@@ -42,17 +49,20 @@ app.get("/healthz", (_req, res) => {
 });
 
 // Middleware
+// CORS: i dev tillates alle origins; i prod tillates kun kjente/domene-configurerte origins
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "http://localhost:5175",
-    "http://127.0.0.1:5175",
-  "http://localhost:5176",
-  "http://127.0.0.1:5176",
-  ],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // same-origin eller server-til-server
+    if (NODE_ENV !== "production") return callback(null, true);
+    // Prod: tillat eksplisitt oppgitte origins
+    const envList = (process.env.APP_ORIGINS || "https://bsk.kjibba.no").split(",").map(s => s.trim()).filter(Boolean);
+    // Tillat localhost-opprinnelser for lokal kjøring via nginx-proxy
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  // Tillat privat LAN-opprinnelser (for mobil på samme nett) når man kjører lokalt via nginx (5175)
+  const isPrivateLan = /^https?:\/\/(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(origin);
+  if (envList.includes(origin) || isLocal || isPrivateLan) return callback(null, true);
+    return callback(new Error("CORS not allowed"));
+  },
   credentials: true,
 }));
 
@@ -65,9 +75,14 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: NODE_ENV === "production",
+  // Bruk Secure-cookie kun dersom eksplisitt slått på via env i miljø med HTTPS
+  secure: COOKIE_SECURE,
+  sameSite: "lax",
+  // Sett domain dersom spesifisert (trengs for noen proxyscenarier)
+  domain: COOKIE_DOMAIN as any,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
+  name: COOKIE_NAME,
 }));
 
 // File upload middleware
@@ -90,6 +105,21 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+// Global guard: require authentication for all /api routes except /api/auth and health endpoints.
+app.use("/api", (req, res, next) => {
+  try {
+    const p = req.path || "";
+    // allow auth routes and health checks
+    if (p === "/health" || p === "/healthz") return next();
+    if (p.startsWith("/auth")) return next();
+  // allow client error logging without auth only for POST (so we can capture pre-login issues)
+  if (p === "/meta/client-log" && req.method === 'POST') return next();
+    // Delegate to requireAuthenticated which handles session or JWT
+    return requireAuthenticated(req, res, next);
+  } catch (e) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+});
 app.use("/api/customers", customerRoutes);
 app.use("/api/map", customerRoutes); // map routes are in customers
 app.use("/api/visits", visitRoutes);

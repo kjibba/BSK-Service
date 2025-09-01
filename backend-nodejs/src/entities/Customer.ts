@@ -31,6 +31,12 @@ export class Customer {
   @Column({ type: "varchar", length: 100, nullable: true })
   email?: string;
 
+  @Column({ name: "org_number", type: "varchar", length: 20, nullable: true })
+  orgNumber?: string;
+
+  @Column({ name: "created_at", type: "datetime", nullable: true })
+  createdAt?: Date;
+
   @Column({  name: "visits_per_year", type: "int", nullable: true })
   visitsPerYear?: number;
 
@@ -69,11 +75,13 @@ export class Customer {
       contact_person: this.contactPerson,
       phone: this.phone,
       email: this.email,
+  org_number: this.orgNumber,
       visits_per_year: this.visitsPerYear,
   start_date: formatEuropeanDate(this.startDate),
       latitude: this.latitude,
       longitude: this.longitude,
   active: this.active,
+  created_at: this.createdAt ? this.createdAt.toISOString?.() : undefined,
     };
   }
 }

@@ -41,6 +41,13 @@ export class Visit {
   @Column({ name: "completed_at", type: "datetime", nullable: true })
   completedAt?: Date;
 
+  // Signatures (URLs to stored images/PDFs)
+  @Column({ name: "customer_signature_url", type: "varchar", length: 500, nullable: true })
+  customerSignatureUrl?: string;
+
+  @Column({ name: "technician_signature_url", type: "varchar", length: 500, nullable: true })
+  technicianSignatureUrl?: string;
+
   // Checklist + summary
   @Column({ name: "oppsummering_notat", type: "text", nullable: true })
   oppsummeringNotat?: string;
@@ -85,6 +92,8 @@ export class Visit {
       sjekk_agnstasjoner: this.sjekkAgnstasjoner,
       sjekk_inngangspunkter: this.sjekkInngangspunkter,
       sjekk_fellefangst: this.sjekkFellefangst,
+  customer_signature_url: this.customerSignatureUrl,
+  technician_signature_url: this.technicianSignatureUrl,
     };
   }
 }

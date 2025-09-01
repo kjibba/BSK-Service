@@ -3,6 +3,8 @@ import { CustomersAPI, EquipmentAPI, EquipmentTypesAPI, VisitsAPI, EmployeesAPI,
 import Card from './ui/Card'
 import Button from './ui/Button'
 import { Loading, Empty, ErrorState } from './ui/States'
+import PageHeader from './ui/PageHeader'
+import { IconRefresh, IconPlus, IconChevronDown, IconChevronUp, IconEdit } from './ui/icons'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import 'leaflet.gridlayer.googlemutant'
@@ -58,7 +60,43 @@ export default function CustomerDetail({ customerId }) {
     }
   }, [customerId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    // Require authenticated user to load customer data
+    try {
+      if (!user) {
+        // redirect to login page
+        window.location.hash = 'login'
+        return
+      }
+    } catch (e) { /* ignore */ }
+    load()
+  }, [load, user])
+
+  const handleDeactivate = async () => {
+    if (!window.confirm(`Deaktivere kunden "${data?.customer?.name || ''}" (ID: ${customerId})? Du kan reaktivere senere.`)) return
+    try {
+      await CustomersAPI.delete(customerId)
+      toast.push({ variant: 'success', title: 'Deaktivert', description: 'Kunden ble deaktivert.' })
+      try {
+        const fromMap = sessionStorage.getItem('bsk:fromMap')
+        if (fromMap && String(fromMap) === String(customerId)) {
+          sessionStorage.removeItem('bsk:fromMap')
+          window.location.hash = 'map'
+        } else {
+          window.location.hash = 'customers'
+        }
+      } catch (e) {
+        window.location.hash = 'customers'
+      }
+    } catch (e) {
+      console.debug(e)
+      const msg = e?.response?.data?.error || e?.message || 'Kunne ikke deaktivere kunde.'
+      toast.push({ variant: 'error', title: 'Feil', description: String(msg) })
+    }
+  }
+
+  // Active visit for this customer, available to effects and render
+  const activeVisit = (data?.visits || []).find(v => v.status === 'Pågående')
 
   // initialize map once
   useEffect(() => {
@@ -281,8 +319,7 @@ export default function CustomerDetail({ customerId }) {
     try { m.openPopup() } catch (e) { console.debug(e) }
     }
 
-  // Detect active visit for this customer to enable direct service links
-  const activeVisit = (data.visits || []).find(v => v.status === 'Pågående')
+  // Active visit is computed at component scope to enable direct service links
     equipment.forEach(e => {
       if (e._lat == null || e._lng == null) return
       const m = L.marker([e._lat, e._lng])
@@ -311,14 +348,14 @@ export default function CustomerDetail({ customerId }) {
     } catch (e) { console.debug(e) }
 
   try { map.invalidateSize(true) } catch (e) { console.debug(e) }
-  }, [data, baseReady, load, toast])
+  }, [data, baseReady, load, toast, activeVisit])
 
   // populate form when data arrives
   useEffect(() => {
     if (!data || !data.customer) return
     const c = data.customer
     setForm({
-      name: c.name || '', address: c.address || '', postal_code: c.postal_code || '', city: c.city || '', contact_person: c.contact_person || '', email: c.email || '', phone: c.phone || '', visits_per_year: c.visits_per_year ?? '', start_date: c.start_date || '', latitude: c.latitude ?? '', longitude: c.longitude ?? ''
+  name: c.name || '', address: c.address || '', postal_code: c.postal_code || '', city: c.city || '', contact_person: c.contact_person || '', email: c.email || '', phone: c.phone || '', org_number: c.org_number || '', visits_per_year: c.visits_per_year ?? '', start_date: c.start_date || '', latitude: c.latitude ?? '', longitude: c.longitude ?? ''
     })
   }, [data])
 
@@ -338,6 +375,7 @@ export default function CustomerDetail({ customerId }) {
       contact_person: form.contact_person || undefined,
       email: form.email || undefined,
       phone: form.phone || undefined,
+  org_number: form.org_number || undefined,
       visits_per_year: form.visits_per_year === '' ? null : Number(form.visits_per_year),
       start_date: form.start_date || null,
       latitude: form.latitude === '' ? null : Number(form.latitude),
@@ -353,6 +391,24 @@ export default function CustomerDetail({ customerId }) {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
+      <PageHeader
+        title={customer.name || `Kunde #${customer.id}`}
+        actions={(
+          <>
+            {activeVisit ? (
+              <Button variant="primary" onClick={() => window.location.hash = `visit:${activeVisit.id}`}>
+                Oppdrag pågår — åpne
+              </Button>
+            ) : (
+              isAdmin ? <Button type="button" className="btn-icon" onClick={() => setCreatingVisit(v => !v)}><IconPlus /> Nytt</Button> : null
+            )}
+            {isAdmin && (
+              <Button variant="danger" type="button" onClick={handleDeactivate} style={{ marginLeft: 8 }}>Deaktiver</Button>
+            )}
+            <Button type="button" className="btn-icon" onClick={() => load({ silent: true })}><IconRefresh /> Oppdater</Button>
+          </>
+        )}
+      />
       <Card>
         <h2 style={{ marginTop: 0 }}>{customer.name}</h2>
         <div>{customer.address}</div>
@@ -361,20 +417,13 @@ export default function CustomerDetail({ customerId }) {
           <div>Kontakt: {customer.contact_person || '-'}</div>
           <div>E-post: {customer.email || '-'} · Telefon: {customer.phone || '-'}</div>
         </div>
-  <div style={{ marginTop: 10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          {(() => {
-            // Kun vis aktiv knapp for pågående oppdrag (ikke planlagt)
-            const active = (data.visits || []).find(v => v.status === 'Pågående')
-            if (active) {
-              return (
-                <>
-                  <Button type="button" variant="primary" onClick={() => window.location.hash = `visit:${active.id}`}>Oppdrag pågår — åpne</Button>
-                  <span style={{ fontSize:12, color:'#475569' }}>Dato: {active.visit_date ? new Date(active.visit_date).toLocaleString() : '-'}</span>
-                </>
-              )
-            }
-            return isAdmin ? (<Button type="button" onClick={() => setCreatingVisit(v => !v)}>+ Nytt oppdrag</Button>) : null
-          })()}
+        <div style={{ marginTop: 10 }}>
+          {activeVisit ? (
+            <span style={{ fontSize:12, color:'#475569' }}>Aktivt oppdrag: {activeVisit.visit_date ? new Date(activeVisit.visit_date).toLocaleString() : '-'}</span>
+          ) : null}
+          {customer.created_at ? (
+            <div style={{ fontSize:12, color:'#64748b', marginTop:4 }}>Opprettet: {new Date(customer.created_at).toLocaleDateString()}</div>
+          ) : null}
         </div>
         {creatingVisit && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e2e8f0' }}>
@@ -383,12 +432,46 @@ export default function CustomerDetail({ customerId }) {
         )}
       </Card>
 
-      <Card title="Rediger kunde">
+      <Card title="Deaktiver kunde">
+        <div style={{ color: '#b91c1c', fontSize: 13 }}>Deaktivere kunden slik at den ikke lenger vises i standard lister; dette er reversibelt via reaktivering.</div>
+        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+          {isAdmin ? (
+            <Button variant="danger" onClick={async () => {
+              if (!window.confirm(`Deaktivere kunden "${customer.name}" (ID: ${customer.id})? Du kan reaktivere senere.`)) return
+              try {
+                await CustomersAPI.delete(customer.id)
+                toast.push({ variant: 'success', title: 'Deaktivert', description: 'Kunden ble deaktivert.' })
+                // If the user opened this customer from the map, return to the map; otherwise go to customers list
+                try {
+                  const fromMap = sessionStorage.getItem('bsk:fromMap')
+                  if (fromMap && String(fromMap) === String(customer.id)) {
+                    sessionStorage.removeItem('bsk:fromMap')
+                    window.location.hash = 'map'
+                  } else {
+                    window.location.hash = 'customers'
+                  }
+                } catch (e) {
+                  // fallback
+                  window.location.hash = 'customers'
+                }
+              } catch (e) {
+                console.debug(e)
+                const msg = e?.response?.data?.error || e?.message || 'Kunne ikke deaktivere kunde.'
+                toast.push({ variant: 'error', title: 'Feil', description: String(msg) })
+              }
+            }}>Deaktiver kunde</Button>
+          ) : (
+            <div style={{ color: '#475569' }}>Kun administratorer kan deaktivere kunder.</div>
+          )}
+        </div>
+      </Card>
+
+  <Card title="Rediger kunde">
         {!showEditCustomer ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ color: '#475569', fontSize: 13 }}>Klikk for å redigere kundedetaljer.</div>
             <div>
-              <Button type="button" onClick={() => setShowEditCustomer(true)}>Rediger kunde</Button>
+      <Button type="button" onClick={() => setShowEditCustomer(true)}><IconEdit /> Rediger</Button>
             </div>
           </div>
         ) : (
@@ -402,6 +485,10 @@ export default function CustomerDetail({ customerId }) {
             <div style={{ display: 'flex', gap: 8 }}>
               <label style={{ flex: 1 }}><div>E-post</div><input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></label>
               <label style={{ flex: 1 }}><div>Telefon</div><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1 }}><div>Org.nr</div><input value={form.org_number} onChange={e => setForm(f => ({ ...f, org_number: e.target.value }))} placeholder="999 999 999" /></label>
+              <div style={{ flex: 1 }} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <label style={{ flex: 1 }}><div>Besøk pr år</div><input type="number" min="0" value={form.visits_per_year} onChange={e => setForm(f => ({ ...f, visits_per_year: e.target.value }))} /></label>
@@ -482,7 +569,7 @@ export default function CustomerDetail({ customerId }) {
         )}
       </Card>
 
-      <Card title="Kart og utstyr">
+  <Card title="Kart og utstyr">
         <div>
           <div style={{ height: 360, borderRadius: 8, overflow: 'hidden' }}>
             <div ref={mapEl} style={{ width: '100%', height: '100%' }} />
@@ -753,19 +840,19 @@ export default function CustomerDetail({ customerId }) {
         </div>
       </Card>
 
-      <Card title="Servicehistorikk">
+  <Card title="Servicehistorikk">
         {!showVisits ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ color: '#475569', fontSize: 13 }}>Klikk for å vise servicehistorikk.</div>
             <div>
-              <Button type="button" onClick={() => setShowVisits(true)}>Vis servicehistorikk</Button>
+      <Button type="button" onClick={() => setShowVisits(true)}><IconChevronDown /> Vis</Button>
             </div>
           </div>
         ) : (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>Historikk</div>
-              <div><Button type="button" onClick={() => setShowVisits(false)}>Skjul</Button></div>
+      <div><Button type="button" onClick={() => setShowVisits(false)}><IconChevronUp /> Skjul</Button></div>
             </div>
             <div style={{ marginTop: 8 }}>
               {!data.visits?.length ? <Empty>Ingen besøk registrert.</Empty> : (
@@ -836,19 +923,19 @@ export default function CustomerDetail({ customerId }) {
         )}
       </Card>
 
-      <Card title="Servicerapporter (PDF)">
+  <Card title="Servicerapporter (PDF)">
         {!showReports ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ color: '#475569', fontSize: 13 }}>Klikk for å vise genererte rapporter.</div>
             <div>
-              <Button type="button" onClick={() => setShowReports(true)}>Vis rapporter</Button>
+      <Button type="button" onClick={() => setShowReports(true)}><IconChevronDown /> Vis</Button>
             </div>
           </div>
         ) : (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>Rapporter</div>
-              <div><Button type="button" onClick={() => setShowReports(false)}>Skjul</Button></div>
+      <div><Button type="button" onClick={() => setShowReports(false)}><IconChevronUp /> Skjul</Button></div>
             </div>
             <div style={{ marginTop: 8 }}>
               {!data.reports?.length ? <Empty>Ingen rapporter generert ennå.</Empty> : (
@@ -871,19 +958,19 @@ export default function CustomerDetail({ customerId }) {
         )}
       </Card>
 
-      <Card title="Logger">
+  <Card title="Logger">
         {!showLogs ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ color: '#475569', fontSize: 13 }}>Klikk for å vise logger.</div>
             <div>
-              <Button type="button" onClick={() => setShowLogs(true)}>Vis logger</Button>
+      <Button type="button" onClick={() => setShowLogs(true)}><IconChevronDown /> Vis</Button>
             </div>
           </div>
         ) : (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>Logger</div>
-              <div><Button type="button" onClick={() => setShowLogs(false)}>Skjul</Button></div>
+      <div><Button type="button" onClick={() => setShowLogs(false)}><IconChevronUp /> Skjul</Button></div>
             </div>
             <div style={{ marginTop: 8 }}>
               {!data.logs?.length ? <Empty>Ingen logger.</Empty> : (

@@ -14,16 +14,30 @@ api.interceptors.response.use(
     try {
       const status = error?.response?.status
       const url = error?.config?.url || 'ukjent'
-      const detailMsg = error?.response?.data?.message || error?.message || 'Ukjent feil'
+      const data = error?.response?.data || {}
+      const issues = Array.isArray(data?.errors) ? data.errors : []
+      const issuesText = issues.slice(0, 3).map(e => `${e.path ? `${e.path}: `:''}${e.message}`).join('; ')
+      const detailMsg = issuesText || data?.message || data?.error || error?.message || 'Ukjent feil'
       // Only toast on real HTTP errors (not cancellations)
       if (!axios.isCancel(error)) {
         const variant = status >= 500 ? 'danger' : status >= 400 ? 'warning' : 'default'
         const title = status ? `Feil ${status}` : 'Feil'
         const description = `${title} ved ${url}: ${detailMsg}`
-        window.dispatchEvent(new CustomEvent('app:toast', { detail: { variant, title, description, timeout: 5000 } }))
+        // Avoid spamming toasts on 401, since we redirect; otherwise toast
+        if (status !== 401) {
+          window.dispatchEvent(new CustomEvent('app:toast', { detail: { variant, title, description, timeout: 5000 } }))
+        }
+        // Send klientlogg (brann-og-glem)
+        try { navigator.sendBeacon && navigator.sendBeacon('/api/meta/client-log', new Blob([JSON.stringify({
+          level: status >= 500 ? 'error' : 'warn',
+          message: description,
+          url: window.location.href,
+          route: window.location.hash?.slice(1) || '',
+          meta: { apiUrl: url, status, data: error?.response?.data }
+        })], { type: 'application/json' })) } catch {}
       }
       // If unauthorized, force redirect to login and avoid showing stale content
-      if (status === 401) {
+  if (status === 401) {
         try { sessionStorage.setItem('post-login-redirect', window.location.hash || '#customers') } catch {}
         try { if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k))) } catch {}
         window.location.hash = 'login'
@@ -42,12 +56,20 @@ export function setAuthToken(token) {
   }
 }
 
+// Bootstrap: hent evt. lagret token og sett Authorization header ved app-oppstart
+try {
+  const saved = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('bsk:token'))
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('bsk:token'))
+  if (saved) setAuthToken(saved)
+} catch (_) { /* no-op */ }
+
 export const CustomersAPI = {
   list: (params) => api.get('/customers', { params }).then(r => r.data),
   create: (payload) => api.post('/customers', payload).then(r => r.data),
   update: (id, payload) => api.put(`/customers/${id}`, payload).then(r => r.data),
   fixGeo: (id, lat, lng) => api.post(`/customers/${id}/fix-geo`, { latitude: lat, longitude: lng }).then(r => r.data),
   detail: (id) => api.get(`/customers/${id}/detail`).then(r => r.data),
+  delete: (id) => api.delete(`/customers/${id}`).then(r => r.data),
 }
 
 export const EquipmentAPI = {
@@ -71,6 +93,7 @@ export const VisitsAPI = {
     create: (id, payload) => api.post(`/visits/${id}/logs`, payload).then(r => r.data),
   },
   complete: (id, payload) => api.post(`/visits/${id}/complete`, payload).then(r => r.data),
+  update: (id, payload) => api.put(`/visits/${id}`, payload).then(r => r.data),
   assign: (id, technicianId) => api.post(`/visits/${id}/assign`, { assigned_technician_id: technicianId }).then(r => r.data),
   batchDelete: (ids) => api.post('/visits/batch_delete', { ids }).then(r => r.data),
   delete: (id) => api.delete(`/visits/${id}`).then(r => r.data),
@@ -101,6 +124,9 @@ export const AuthAPI = {
   login: (email, password) => api.post('/auth/login', { email, password }).then(r => r.data),
   logout: () => api.post('/auth/logout').then(r => r.data),
   whoami: () => api.get('/auth/whoami').then(r => r.data),
+  passwordStatus: () => api.get('/auth/password_status').then(r => r.data),
+  setPassword: (password) => api.post('/auth/set_password', { password }).then(r => r.data),
+  token: () => api.get('/auth/token').then(r => r.data),
 }
 
 export const EmployeesAPI = {

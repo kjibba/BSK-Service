@@ -6,7 +6,7 @@ import { Equipment } from "../entities/Equipment";
 import { EquipmentType } from "../entities/EquipmentType";
 import { Visit } from "../entities/Visit";
 import { Customer } from "../entities/Customer";
-import { requireJwt, requireAdmin } from "./auth";
+import { requireAdmin, requireAuthenticated } from "./auth";
 
 const router = express.Router();
 
@@ -227,7 +227,7 @@ export default router;
 // Body: { latitude?, longitude?, max_distance_m?, force?, dry_run? }
 // Behavior: finds nearest active customer with coords to given (lat,lng) (from body or equipment),
 // and assigns equipment.customerId to that customer's id if within threshold. If dry_run, no update.
-router.post("/:id/assign_nearest", requireJwt, requireAdmin(), async (req, res) => {
+router.post("/:id/assign_nearest", requireAuthenticated, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) {
@@ -250,11 +250,23 @@ router.post("/:id/assign_nearest", requireJwt, requireAdmin(), async (req, res) 
     const isDryRun = !!dry_run;
     const doForce = !!force;
 
-    // Fetch candidate customers with coords (prefer active)
-    const customers = await customerRepository.createQueryBuilder("c")
-      .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
-      .andWhere("c.active = 1")
-      .getMany();
+    // Fetch candidate customers with coords.
+    // Try with active-filter first; if column missing (restored DB), retry without it.
+    let customers: Customer[] = [];
+    try {
+      customers = await customerRepository.createQueryBuilder("c")
+        .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
+        .andWhere("c.active = 1")
+        .getMany();
+    } catch (err: any) {
+      if (err && (err.code === 'ER_BAD_FIELD_ERROR' || String(err?.message || '').includes("Unknown column 'c.active'"))) {
+        customers = await customerRepository.createQueryBuilder("c")
+          .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
+          .getMany();
+      } else {
+        throw err;
+      }
+    }
     if (!customers.length) {
       return res.status(404).json({ error: "No customers with coordinates available" });
     }
@@ -312,7 +324,7 @@ router.post("/:id/assign_nearest", requireJwt, requireAdmin(), async (req, res) 
 // POST /api/equipment/assign_nearest/batch
 // Body: { max_distance_m?, dry_run?, limit? }
 // For alle utstyr med koordinater, finn nærmeste aktive kunde og tilordne hvis innen terskel.
-router.post("/assign_nearest/batch", requireJwt, requireAdmin(), async (req, res) => {
+router.post("/assign_nearest/batch", requireAuthenticated, async (req, res) => {
   try {
     const { max_distance_m, dry_run, limit } = req.body || {};
     const threshold = Number.isFinite(Number(max_distance_m)) ? Number(max_distance_m) : 250;
@@ -324,10 +336,21 @@ router.post("/assign_nearest/batch", requireJwt, requireAdmin(), async (req, res
     const equipment = await eqRepo.createQueryBuilder("e")
       .where("e.latitude IS NOT NULL AND e.longitude IS NOT NULL")
       .getMany();
-    const customers = await custRepo.createQueryBuilder("c")
-      .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
-      .andWhere("c.active = 1")
-      .getMany();
+    let customers: Customer[] = [];
+    try {
+      customers = await custRepo.createQueryBuilder("c")
+        .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
+        .andWhere("c.active = 1")
+        .getMany();
+    } catch (err: any) {
+      if (err && (err.code === 'ER_BAD_FIELD_ERROR' || String(err?.message || '').includes("Unknown column 'c.active'"))) {
+        customers = await custRepo.createQueryBuilder("c")
+          .where("c.latitude IS NOT NULL AND c.longitude IS NOT NULL")
+          .getMany();
+      } else {
+        throw err;
+      }
+    }
     if (!customers.length) return res.status(404).json({ error: "No customers with coordinates" });
 
     const results: any[] = [];
@@ -362,7 +385,7 @@ router.post("/assign_nearest/batch", requireJwt, requireAdmin(), async (req, res
 // POST /api/equipment/assign_to_customer_by_coords
 // Body: { target_customer_id: number, max_distance_m?, dry_run? }
 // Tilordner alle utstyr innenfor terskel til oppgitt kunde (basert på kundens posisjon).
-router.post("/assign_to_customer_by_coords", requireJwt, requireAdmin(), async (req, res) => {
+router.post("/assign_to_customer_by_coords", requireAuthenticated, async (req, res) => {
   try {
     const { target_customer_id, max_distance_m, dry_run } = req.body || {};
     const targetId = Number(target_customer_id);

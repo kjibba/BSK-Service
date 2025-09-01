@@ -14,6 +14,7 @@ import { Photo } from "./entities/Photo";
 import { Feedback } from "./entities/Feedback";
 import { DailyTask } from "./entities/DailyTask";
 import { ServiceReport } from "./entities/ServiceReport";
+import { ClientLog } from "./entities/ClientLog";
 
 const DB_HOST = process.env.DB_HOST || "localhost";
 const DB_PORT = parseInt(process.env.DB_PORT || "3306");
@@ -52,6 +53,7 @@ export const AppDataSource = new DataSource({
     Feedback,
     DailyTask,
   ServiceReport,
+  ClientLog,
   ],
   // Use TS migrations when running via tsx, else compiled JS from dist
   migrations: [ isTsRuntime ? 'src/migrations/*.ts' : path.join(__dirname, 'migrations', '*.js') ],

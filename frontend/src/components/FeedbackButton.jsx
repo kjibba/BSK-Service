@@ -83,8 +83,13 @@ function collectDiagnostics() {
   }
 }
 
-export default function FeedbackButton({ context = {} }){
-  const [open, setOpen] = useState(false)
+export default function FeedbackButton({ context = {}, open: openProp, onOpenChange, hideTrigger = false }){
+  const isControlled = typeof openProp === 'boolean'
+  const [openState, setOpenState] = useState(false)
+  const open = isControlled ? openProp : openState
+  const setOpen = (v) => {
+    if (isControlled) { onOpenChange && onOpenChange(v) } else { setOpenState(v) }
+  }
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
 
@@ -107,10 +112,12 @@ export default function FeedbackButton({ context = {} }){
   }
 
   return (
-    <div style={{position:'fixed',right:12,bottom:12,zIndex:4000}}>
-      <Button variant="secondary" aria-label={open ? 'Lukk tilbakemeldingsvindu' : 'Send inn tilbakemelding'} onClick={() => setOpen(o => !o)}>{open ? 'Lukk' : 'Send tilbakemelding'}</Button>
+    <div className="feedback-button">
+      {!hideTrigger && (
+        <Button variant="secondary" aria-label={open ? 'Lukk tilbakemeldingsvindu' : 'Send inn tilbakemelding'} onClick={() => setOpen(!open)}>{open ? 'Lukk' : 'Send tilbakemelding'}</Button>
+      )}
       {open && (
-        <div style={{width:360,background:'#fff',padding:12,borderRadius:8,boxShadow:'0 6px 18px rgba(2,6,23,0.12)',marginTop:8}}>
+        <div className="feedback-panel" style={{background:'#fff',padding:12,borderRadius:8,boxShadow:'0 6px 18px rgba(2,6,23,0.12)',marginTop:8}}>
           <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>Hva kan vi forbedre?</div>
           <p style={{fontSize:12,color:'#444',marginTop:0,marginBottom:8}}>
             Vi ønsker å høre om forslag til nye funksjoner, feil (bugs), og alt annet som kan gjøres bedre i appen.

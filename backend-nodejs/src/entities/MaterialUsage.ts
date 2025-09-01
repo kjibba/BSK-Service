@@ -18,6 +18,21 @@ export class MaterialUsage {
   @Column({ type: "float", nullable: true })
   amount?: number;
 
+  @Column({ name: "unit", type: "varchar", length: 20, nullable: true })
+  unit?: string;
+
+  @Column({ name: "batch_number", type: "varchar", length: 50, nullable: true })
+  batchNumber?: string;
+
+  @Column({ name: "risk_assessment", type: "text", nullable: true })
+  riskAssessment?: string;
+
+  @Column({ name: "approved_by", type: "int", nullable: true })
+  approvedBy?: number;
+
+  @Column({ name: "waste_handling", type: "text", nullable: true })
+  wasteHandling?: string;
+
   @ManyToOne(() => ServiceLog, serviceLog => serviceLog.materialsUsed)
   @JoinColumn({ name: "service_log_id" })
   serviceLog!: ServiceLog;
@@ -32,6 +47,11 @@ export class MaterialUsage {
       service_log_id: this.serviceLogId,
       material_id: this.materialId,
       amount: this.amount,
+  unit: this.unit,
+  batch_number: this.batchNumber,
+  risk_assessment: this.riskAssessment,
+  approved_by: this.approvedBy,
+  waste_handling: this.wasteHandling,
     };
   }
 }

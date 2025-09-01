@@ -2,6 +2,7 @@ import express from "express";
 import { AppDataSource } from "../data-source";
 import { Feedback } from "../entities/Feedback";
 import { Employee } from "../entities/Employee";
+import { requireJwt, requireAdmin } from "./auth";
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ router.get("/", async (req, res) => {
 
     const feedbacks = await feedbackRepository.find({
       where: whereClause,
-      relations: ["user", "handler"],
+      // Ikke hent relasjoner for å unngå kolonne-mismatches i employees-tabellen
       order: { createdAt: "DESC" }
     });
 
@@ -48,8 +49,7 @@ router.get("/:id", async (req, res) => {
 
     const feedbackRepository = AppDataSource.getRepository(Feedback);
     const feedback = await feedbackRepository.findOne({
-      where: { id },
-      relations: ["user", "handler"]
+      where: { id }
     });
 
     if (!feedback) {
@@ -96,10 +96,9 @@ router.post("/", async (req, res) => {
 
     await feedbackRepository.save(feedback);
 
-    // Fetch the saved feedback with relations
+    // Hent på nytt uten relasjoner
     const savedFeedback = await feedbackRepository.findOne({
-      where: { id: feedback.id },
-      relations: ["user", "handler"]
+      where: { id: feedback.id }
     });
 
     res.status(201).json(savedFeedback!.toDict());
@@ -110,7 +109,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /api/feedback/:id
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const feedbackRepository = AppDataSource.getRepository(Feedback);
     const employeeRepository = AppDataSource.getRepository(Employee);
@@ -153,10 +152,9 @@ router.put("/:id", async (req, res) => {
 
     await feedbackRepository.save(feedback);
 
-    // Fetch the updated feedback with relations
+    // Hent oppdatert feedback uten relasjoner
     const updatedFeedback = await feedbackRepository.findOne({
-      where: { id: feedback.id },
-      relations: ["user", "handler"]
+      where: { id: feedback.id }
     });
 
     res.json(updatedFeedback!.toDict());
@@ -167,7 +165,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE /api/feedback/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireJwt, requireAdmin(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) {

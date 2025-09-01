@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { RouteChoicesAPI, VisitsAPI } from '../api'
 import { RequireAuth } from './auth'
 import Button from './ui/Button'
+import { IconRefresh } from './ui/icons'
+import PageHeader from './ui/PageHeader'
+import Card from './ui/Card'
 import { Loading, Empty } from './ui/States'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -63,29 +66,31 @@ function Inner(){
   if (!items.length) return <Empty>Ingen kunder i dagsruten i dag.</Empty>
 
   return (
-    <div className="layout-columns">
-      <div className="col">
-        <div className="card">
-          <div style={{height: 380}} ref={mapEl} />
+    <div className="stack" style={{ gap: 16 }}>
+  <PageHeader title="Min dagsrute" actions={(<Button className="btn-icon" onClick={load}><IconRefresh /> Oppdater</Button>)} />
+      <div className="layout-columns">
+        <div className="col">
+          <Card>
+            <div style={{height: 380}} ref={mapEl} />
+          </Card>
         </div>
-      </div>
-      <div className="col">
-        <div className="card">
-          <h3>Min dagsrute</h3>
-          <ul className="list">
-            {items.map(it => (
-              <li key={it.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-                <div>
-                  <div style={{fontWeight:600}}>{it.customer?.name || `Kunde #${it.customer_id}`}</div>
-                  <div style={{fontSize:12, color:'#475569'}}>{[it.customer?.address, [it.customer?.postal_code, it.customer?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</div>
-                </div>
-                <div style={{display:'flex', gap:8}}>
-                  <Button size="sm" onClick={()=> startOrContinue(it.customer_id)}>Start/Fortsett</Button>
-                  <Button size="sm" variant="ghost" onClick={async ()=> { await RouteChoicesAPI.remove(it.id); await load() }}>Fjern</Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <div className="col">
+          <Card>
+            <ul className="list">
+              {items.map(it => (
+                <li key={it.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                  <div>
+                    <div style={{fontWeight:600}}>{it.customer?.name || `Kunde #${it.customer_id}`}</div>
+                    <div style={{fontSize:12, color:'#475569'}}>{[it.customer?.address, [it.customer?.postal_code, it.customer?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</div>
+                  </div>
+                  <div style={{display:'flex', gap:8}}>
+                    <Button size="sm" onClick={()=> startOrContinue(it.customer_id)}>Start/Fortsett</Button>
+                    <Button size="sm" variant="ghost" onClick={async ()=> { await RouteChoicesAPI.remove(it.id); await load() }}>Fjern</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </div>
       </div>
     </div>

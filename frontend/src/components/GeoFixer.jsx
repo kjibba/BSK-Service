@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CustomersAPI, MapAPI } from '../api';
+import PageHeader from './ui/PageHeader';
+import { IconRefresh } from './ui/icons';
+import Card from './ui/Card';
 
 // Simple compact marker for dragging
 const dragIcon = L.divIcon({ className: 'drag-marker', html: '<div style="width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #0f172a"></div>', iconSize: [18,18], iconAnchor: [9,9] });
@@ -21,21 +24,20 @@ export default function GeoFixer(){
   const mapEl = useRef(null);
 
   // Load customers with coordinates (for easier spotting) and also those without
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const all = await CustomersAPI.list();
-        // Prefer those missing coords first
-        const missing = all.filter(c => c.latitude == null || c.longitude == null);
-        const withCoords = all.filter(c => c.latitude != null && c.longitude != null);
-        setCustomers([...missing, ...withCoords]);
-        if (missing.length) setSelectedId(missing[0].id);
-      } catch (e) {
-        setError('Kunne ikke hente kunder: ' + e.message);
-      }
-    };
-    load();
+  const load = useCallback(async (opts) => {
+    try {
+      const all = await CustomersAPI.list();
+      // Prefer those missing coords first
+      const missing = all.filter(c => c.latitude == null || c.longitude == null);
+      const withCoords = all.filter(c => c.latitude != null && c.longitude != null);
+      setCustomers([...missing, ...withCoords]);
+      if (missing.length) setSelectedId(missing[0].id);
+    } catch (e) {
+      setError('Kunne ikke hente kunder: ' + e.message);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const selected = useMemo(() => customers.find(c => c.id === selectedId) || null, [customers, selectedId]);
 
@@ -112,9 +114,10 @@ export default function GeoFixer(){
   };
 
   return (
-    <div className="card" style={{padding:12}}>
-      <h2>Fiks geokoding</h2>
-      <p>Velg kunde med feil plassering og dra markøren til riktig posisjon. Lagre for å oppdatere koordinater.</p>
+    <div className="stack" style={{ gap: 16 }}>
+  <PageHeader title="Fiks geokoding" actions={(<button className="btn btn-icon" type="button" onClick={() => load({ silent: true })}><IconRefresh /> Oppdater</button>)} />
+      <Card>
+        <p>Velg kunde med feil plassering og dra markøren til riktig posisjon. Lagre for å oppdatere koordinater.</p>
       <div style={{display:'flex', gap:12, flexWrap:'wrap', alignItems:'center'}}>
         {/* Search input to quickly narrow down customers */}
         <input
@@ -143,6 +146,7 @@ export default function GeoFixer(){
       <div style={{marginTop:12}}>
         <div ref={mapEl} className="map-container" />
       </div>
+      </Card>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Equipment } from "../entities/Equipment";
 import { Visit } from "../entities/Visit";
 import { MaterialUsage } from "../entities/MaterialUsage";
 import { Material } from "../entities/Material";
+import { ServiceLogUpdateSchema } from "../utils/validation";
 
 const router = express.Router();
 
@@ -156,19 +157,26 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Service log not found" });
     }
 
-    const { log_date, description, hours_worked, materials_used, poison_bait, nonpoison_bait } = req.body || {};
+    const parsed = ServiceLogUpdateSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Ugyldig input",
+        errors: parsed.error.issues?.map(i => ({ path: i.path?.join('.') || '', message: i.message })) || [],
+      });
+    }
+    const { log_date, description, hours_worked, materials_used, poison_bait, nonpoison_bait } = parsed.data;
 
     if (log_date !== undefined) serviceLog.logDate = new Date(log_date);
     if (description !== undefined) serviceLog.description = description;
     if (hours_worked !== undefined) serviceLog.hoursWorked = hours_worked;
 
     // If any materials payload provided, replace existing usages
-    const hasMaterialsPayload = Array.isArray(materials_used) || (poison_bait && typeof poison_bait === "object") || (nonpoison_bait && typeof nonpoison_bait === "object");
+  const hasMaterialsPayload = Array.isArray(materials_used) || (poison_bait && typeof poison_bait === "object") || (nonpoison_bait && typeof nonpoison_bait === "object");
     if (hasMaterialsPayload) {
       // delete existing
       await materialUsageRepository.delete({ serviceLogId: serviceLog.id });
 
-      const addUsage = async (material_id: any, amount: any) => {
+      const addUsage = async (material_id: any, amount: any, extra?: { unit?: any, batch_number?: any, risk_assessment?: any, approved_by?: any, waste_handling?: any }) => {
         try {
           if (material_id === undefined || material_id === null) return;
           const mid = Number(material_id);
@@ -180,13 +188,29 @@ router.put("/:id", async (req, res) => {
             const amt = Number(amount);
             if (!Number.isNaN(amt)) mu.amount = amt;
           }
+          if (extra) {
+            if (extra.unit !== undefined) mu.unit = String(extra.unit);
+            if (extra.batch_number !== undefined) mu.batchNumber = String(extra.batch_number);
+            if (extra.risk_assessment !== undefined) mu.riskAssessment = String(extra.risk_assessment);
+            if (extra.approved_by !== undefined) {
+              const ap = Number(extra.approved_by);
+              if (!Number.isNaN(ap)) mu.approvedBy = ap;
+            }
+            if (extra.waste_handling !== undefined) mu.wasteHandling = String(extra.waste_handling);
+          }
           await materialUsageRepository.save(mu);
         } catch {}
       };
 
       if (Array.isArray(materials_used)) {
         for (const it of materials_used) {
-          await addUsage(it?.material_id, it?.amount);
+          await addUsage(it?.material_id, it?.amount, {
+            unit: (it as any)?.unit,
+            batch_number: (it as any)?.batch_number,
+            risk_assessment: (it as any)?.risk_assessment,
+            approved_by: (it as any)?.approved_by,
+            waste_handling: (it as any)?.waste_handling,
+          });
         }
       }
       const get = (obj: any, ...keys: string[]) => {

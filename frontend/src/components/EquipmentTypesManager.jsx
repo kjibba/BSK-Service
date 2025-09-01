@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Card from './ui/Card'
+import PageHeader from './ui/PageHeader'
+import { IconRefresh, IconPlus } from './ui/icons'
 import Button from './ui/Button'
 import { EquipmentTypesAPI } from '../api'
 import { Loading, Empty } from './ui/States'
@@ -29,18 +31,23 @@ export default function EquipmentTypesManager() {
   if (!items) return <Empty />
 
   return (
-    <div>
-      <Card title="Utstyrstyper">
+    <div className="stack" style={{ gap: 16 }}>
+      <PageHeader
+        title="Utstyrstyper"
+        actions={(
+          <>
+            <Button className="btn-icon" onClick={() => setEditing({ name: '', fields: [] })}><IconPlus /> Ny</Button>
+            <Button className="btn-icon" onClick={() => load()}><IconRefresh /> Oppdater</Button>
+          </>
+        )}
+      />
+      <Card>
         <p style={{marginTop:0, color:'#475569', fontSize:13}}>
           Felter beskriver hvilke data som registreres ved service. Eksempler:
           «Åtekasse» kan ha feltene Forbruk giftåte (%), Benyttet giftåte (valg), Giftåte etterfylt (gram), Benyttet giftfritt åte (valg), Giftfritt etterfylt (gram).
         </p>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <Button onClick={() => setEditing({ name: '', fields: [] })}>Ny type</Button>
-          <Button onClick={() => load()}>Oppdater</Button>
-        </div>
 
-        {!items.length ? <Empty>Ingen registrerte utstyrstyper.</Empty> : (
+  {!items.length ? <Empty>Ingen registrerte utstyrstyper.</Empty> : (
           <ul className="list">
             {items.map(it => (
               <li key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

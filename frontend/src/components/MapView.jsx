@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { MapAPI, VisitsAPI, EmployeesAPI, RouteChoicesAPI } from '../api';
 import { useAuth } from './hooks/useAuth';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet.gridlayer.googlemutant';
+import PageHeader from './ui/PageHeader';
+import { IconRefresh, IconPlus } from './ui/icons';
 
 // Simple colored marker icons using Leaflet DivIcon
 const makeIcon = (color) => {
@@ -52,19 +54,25 @@ export default function MapView() {
   const activeBaseRef = useRef('google_sat');
   const [baseReady, setBaseReady] = useState(false);
 
-  useEffect(() => {
-  const load = async () => {
-      try {
-    const data = await MapAPI.customers();
-        setCustomers(data);
-      } catch (e) {
-        setError('Kunne ikke hente kunder til kart. ' + e.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const load = useCallback(async (opts) => {
+    const silent = !!(opts && opts.silent);
+    if (!silent) setLoading(true);
+    try {
+  // Require auth before fetching map data
+  try { if (!user) { window.location.hash = 'login'; return } } catch (e) { }
+  const data = await MapAPI.customers();
+  // Hide deactivated customers client-side immediately if backend included 'active' flag,
+  // or if backend didn't include it, we still accept whatever backend returned.
+  const visible = Array.isArray(data) ? data.filter(c => (c.active === undefined) ? true : !!c.active) : data;
+  setCustomers(visible);
+    } catch (e) {
+      setError('Kunne ikke hente kunder til kart. ' + e.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const center = useMemo(() => {
     if (!customers.length) return [60.39299, 5.32415]; // Bergen approx
@@ -150,18 +158,36 @@ export default function MapView() {
         console.error('Marker creation failed for customer', c?.id, err)
         return
       }
-      const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
+    const nextText = c.next_visit_date ? new Date(c.next_visit_date).toLocaleString() : 'Ikke planlagt';
     const expectedText = c.expected_service_date ? new Date(c.expected_service_date).toLocaleString() : 'Ukjent';
     const plannedText = c.planned_next_visit_date ? new Date(c.planned_next_visit_date).toLocaleString() : 'Ikke planlagt';
   const routeBtn = `<button type=\"button\" class=\"btn-add-route\" data-id=\"${c.id}\" style=\"padding:4px 8px;font-size:12px\">+ Legg til i Dagsrute</button>`;
   const newBtn = isAdmin ? `<button type=\"button\" class=\"btn-new-visit\" data-id=\"${c.id}\" style=\"padding:4px 8px;font-size:12px\">+ Nytt oppdrag</button>` : '';
   const formHtml = isAdmin ? `<div class=\"new-visit-form\" style=\"display:none;margin-top:8px;border-top:1px solid #e2e8f0;padding-top:8px\"><label style=\"display:block;margin-bottom:6px;font-size:12px\">Dato og tid<input type=\"datetime-local\" class=\"nv-date\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\" /></label><label style=\"display:block;margin-bottom:6px;font-size:12px\">Tekniker<select class=\"nv-tech\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\"><option value=\"\">(ingen)</option></select></label><label style=\"display:block;margin-bottom:6px;font-size:12px\">Notat<input class=\"nv-notes\" style=\"width:100%;box-sizing:border-box;margin-top:4px;padding:6px\" /></label><div style=\"display:flex;gap:6px;justify-content:flex-end\"><button type=\"button\" class=\"nv-cancel\" style=\"padding:4px 8px;font-size:12px\">Avbryt</button><button type=\"button\" class=\"nv-save\" style=\"padding:4px 8px;font-size:12px\">Opprett</button></div></div>` : '';
-  const html = `<div style=\"min-width:260px\"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style=\"margin-top:8px\"><div><strong>Forventet service:</strong> ${expectedText}</div><div style=\"margin-top:4px\"><span style=\"color:#475569\">Planlagt besøk:</span> ${plannedText}</div></div><div style=\"margin-top:8px;display:flex;gap:6px;flex-wrap:wrap\"><a class=\"btn-open\" href=\"#customer:${c.id}\">Åpne kundekort</a>${routeBtn}${newBtn}</div>${formHtml}</div>`;
+  const openSheetBtn = `<button type=\"button\" class=\"btn-open-sheet\" data-id=\"${c.id}\" style=\"padding:4px 8px;font-size:12px\">Vis i bunnark</button>`;
+  const html = `<div style=\"min-width:260px\"><strong>${c.name ?? ''}</strong><div>${c.address ?? ''}</div><div style=\"margin-top:8px\"><div><strong>Forventet service:</strong> ${expectedText}</div><div style=\"margin-top:4px\"><span style=\"color:#475569\">Planlagt besøk:</span> ${plannedText}</div></div><div style=\"margin-top:8px;display:flex;gap:6px;flex-wrap:wrap\"><a class=\"btn-open\" href=\"#customer:${c.id}\" data-customer-id=\"${c.id}\">Åpne kundekort</a>${routeBtn}${newBtn}${openSheetBtn}</div>${formHtml}</div>`;
   try { m.bindPopup(html) } catch (err) { console.error('bindPopup failed', err) }
         m.on('popupopen', async (ev) => {
           const root = ev.popup.getElement();
           const btn = root.querySelector('.btn-new-visit');
           const addRouteBtn = root.querySelector('.btn-add-route');
+          const openSheet = root.querySelector('.btn-open-sheet');
+          if (openSheet) {
+            openSheet.addEventListener('click', (e) => {
+              e.preventDefault(); e.stopPropagation();
+              try {
+                if ((import.meta && import.meta.env && import.meta.env.VITE_ENABLE_NEW_UI) === 'true') {
+                  const detail = { type: 'customer', customer: c }
+                  window.dispatchEvent(new CustomEvent('app:openSheet', { detail }))
+                } else {
+                  // fallback: go to customer page
+                  window.location.hash = `customer:${c.id}`
+                }
+              } catch (_) {
+                window.location.hash = `customer:${c.id}`
+              }
+            }, { once: true })
+          }
           if (addRouteBtn) {
             addRouteBtn.addEventListener('click', async (e) => {
               e.preventDefault(); e.stopPropagation();
@@ -173,6 +199,15 @@ export default function MapView() {
               }
             }, { once: true })
           }
+          // Mark navigation source so CustomerDetail can return to map after actions
+          try {
+            const openLink = root.querySelector('.btn-open')
+            if (openLink) {
+              openLink.addEventListener('click', () => {
+                try { sessionStorage.setItem('bsk:fromMap', String(c.id)) } catch (e) { console.debug(e) }
+              })
+            }
+          } catch (e) { console.debug(e) }
           const formBox = root.querySelector('.new-visit-form');
           const techSel = root.querySelector('.nv-tech');
           const cancelBtn = root.querySelector('.nv-cancel');
@@ -240,7 +275,9 @@ export default function MapView() {
   if (error) return <div>Feil: {error}</div>;
 
   return (
-    <div className="map-wrapper">
+    <div className="stack" style={{ gap: 16 }}>
+  <PageHeader title="Kart" actions={(<button className="btn btn-icon" type="button" onClick={() => load({ silent: true })}><IconRefresh /> Oppdater</button>)} />
+      <div className="map-wrapper">
   {baseReady && layerCtrlRef.current && layerCtrlRef.current.gRoad && layerCtrlRef.current.gSat && (
         <div className="map-toggle">
           <button
@@ -277,6 +314,7 @@ export default function MapView() {
         <div><span className="dot" style={{background:'#dc2626'}}></span>Forbi frist / mangler plan</div>
       </div>
       <div ref={mapEl} className="map-container" />
+    </div>
     </div>
   );
 }

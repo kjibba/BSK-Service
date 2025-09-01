@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { CustomersAPI } from '../api';
 import { Loading, ErrorState } from './ui/States';
 import { RequireAuth } from './auth';
+import PageHeader from './ui/PageHeader';
+import { IconRefresh, IconPlus } from './ui/icons';
 
 // Colors and status logic reused from MapView
 const COLORS = { green: '#16a34a', yellow: '#f59e0b', red: '#dc2626' };
@@ -79,31 +81,33 @@ const CustomerList = () => {
   return (
     <RequireAuth>
       <div>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'8px 0 12px', gap: 12}}>
-          <h1 style={{margin:0}}>Kunder</h1>
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
+        <PageHeader
+          className="customers-header"
+          title="Kunder"
+          actions={
             <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <input
-                type="search"
-                aria-label="Søk kunder"
-                placeholder="Søk kunde (navn, adresse eller id)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{padding:'8px 10px', borderRadius:6, border:'1px solid #ccc', width:340}}
-                aria-controls="customer-list"
-              />
-              {searchTerm && <button className="btn" onClick={() => setSearchTerm('')}>Tøm</button>}
+              <label htmlFor="sortmode" style={{fontSize:12, color:'#555'}}>Sorter:</label>
+              <select id="sortmode" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+                <option value="next">Neste besøk</option>
+                <option value="alpha">Alfabetisk</option>
+              </select>
+              <button className="btn btn-icon" onClick={() => (location.hash = '#customer:new')}><IconPlus /> Ny kunde</button>
+              <button className="btn btn-icon" onClick={() => setSearchTerm(s => s)} title="Oppdater liste"><IconRefresh /> Oppdater</button>
             </div>
-
-            <label htmlFor="sortmode" style={{fontSize:12, color:'#555'}}>Sorter:</label>
-            <select id="sortmode" value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
-              <option value="next">Neste besøk</option>
-              <option value="alpha">Alfabetisk</option>
-            </select>
-
-            <button className="btn" onClick={() => (location.hash = '#customer:new')}>Ny kunde</button>
-          </div>
-        </div>
+          }
+        >
+          <input
+            className="search-input"
+            type="search"
+            aria-label="Søk kunder"
+            placeholder="Søk kunde (navn, adresse eller id)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{padding:'8px 10px', borderRadius:6, border:'1px solid #ccc', width:'100%', maxWidth: 540}}
+            aria-controls="customer-list"
+          />
+          {searchTerm && <button className="btn" onClick={() => setSearchTerm('')}>Tøm</button>}
+        </PageHeader>
 
         <div className="customer-list" id="customer-list">
           {loading && customers.length === 0 ? (

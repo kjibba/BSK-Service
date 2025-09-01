@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FeedbackAPI } from '../api'
 import Button from './ui/Button'
+import { IconRefresh } from './ui/icons'
+import PageHeader from './ui/PageHeader'
 
 export default function FeedbackAdmin(){
   const [items, setItems] = useState([])
@@ -48,13 +50,15 @@ export default function FeedbackAdmin(){
 
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <h2>Feedback (admin)</h2>
-        <div style={{display:'flex',gap:8}}>
-          <input type="number" value={tail} onChange={e=> setTail(Number(e.target.value || 0))} style={{width:80}} />
-          <Button onClick={refresh}>Last på nytt</Button>
-        </div>
-      </div>
+      <PageHeader
+        title={<h2 style={{margin:0}}>Feedback (admin)</h2>}
+        actions={
+          <>
+            <input className="search-input" type="number" value={tail} onChange={e=> setTail(Number(e.target.value || 0))} style={{width:120}} />
+            <Button className="btn-icon" onClick={refresh}><IconRefresh /> Oppdater</Button>
+          </>
+        }
+      />
       {loading ? <div>Laster…</div> : (
         <div style={{display:'flex',gap:16}}>
           <ul style={{flex:1}}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { EmployeesAPI } from '../api'
 import Button from './ui/Button'
 import Card from './ui/Card'
+import PageHeader from './ui/PageHeader'
 import { Loading, ErrorState } from './ui/States'
 import { useToast } from './ui/Toast.jsx'
 
@@ -73,8 +74,12 @@ export default function EmployeeDetail({ id }){
   if (error) return <ErrorState message={'Kunne ikke hente ansatt'} onRetry={() => { setError(null); setLoading(true); EmployeesAPI.detail(id).then(setData).finally(()=>setLoading(false)) }} />
 
   return (
-    <div className="stack">
-      <Card title={isNew ? 'Ny ansatt' : `Ansatt — ${data.name || data.email}`}>
+    <div className="stack" style={{ gap: 16 }}>
+      <PageHeader
+        title={isNew ? 'Ny ansatt' : (data.name ? `Ansatt — ${data.name}` : `Ansatt — ${data.email || ''}`)}
+        actions={(<Button onClick={()=> location.hash = '#employees'}>Til liste</Button>)}
+      />
+      <Card>
         <div style={{display:'grid', gap:12}}>
           <input className="input" placeholder="Navn" value={data.name || ''} onChange={e=> setData(d=> ({...d, name:e.target.value}))} />
           <input className="input" placeholder="E-post" value={data.email || ''} onChange={e=> setData(d=> ({...d, email:e.target.value}))} />
